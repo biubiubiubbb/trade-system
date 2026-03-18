@@ -2,6 +2,10 @@
 @tailwind components;
 @tailwind utilities;
 
+@import './theme/themes/financial.css';
+@import './theme/themes/cartoon.css';
+@import './theme/themes/minimal.css';
+
 :root {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 }

@@ -1,0 +1,14 @@
+.theme-cartoon {
+  --color-primary: #FFD700;
+  --color-secondary: #FF6B6B;
+  --color-background: #87CEEB;
+  --color-surface: #FFFFFF;
+  --color-text: #2D3436;
+  --color-text-secondary: #636E72;
+  --color-border: #B2BEC3;
+  --color-up: #FF4757;
+  --color-down: #2ECC71;
+  --radius: 0;
+  --shadow: none;
+  font-family: 'Courier New', monospace;
+}

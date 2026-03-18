@@ -1,0 +1,13 @@
+.theme-minimal {
+  --color-primary: #000000;
+  --color-secondary: #6B7280;
+  --color-background: #FFFFFF;
+  --color-surface: #FAFAFA;
+  --color-text: #000000;
+  --color-text-secondary: #6B7280;
+  --color-border: #E5E7EB;
+  --color-up: #000000;
+  --color-down: #9CA3AF;
+  --radius: 0;
+  --shadow: none;
+}
