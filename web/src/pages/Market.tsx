@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { KLineChart } from '../components/charts/KLineChart';
+import { useTheme } from '../theme/ThemeContext';
 
 interface Stock {
   code: string;
@@ -8,30 +9,20 @@ interface Stock {
   market: string;
   industry?: string;
   realtime?: {
-    price: number;
-    change: number;
-    changePct: number;
-    high: number;
-    low: number;
-    open: number;
-    prevClose: number;
-    volume: number;
-    amount: number;
+    price: number; change: number; changePct: number;
+    high: number; low: number; open: number;
+    prevClose: number; volume: number; amount: number;
   };
 }
-
 interface HistoryData {
-  date: string;
-  open: number;
-  close: number;
-  high: number;
-  low: number;
-  volume: number;
+  date: string; open: number; close: number;
+  high: number; low: number; volume: number;
 }
 
 export function Market() {
   const [searchParams, setSearchParams] = useSearchParams();
   const selectedCode = searchParams.get('code');
+  const { theme } = useTheme();
 
   const [stocks, setStocks] = useState<Stock[]>([]);
   const [selectedStock, setSelectedStock] = useState<Stock | null>(null);
@@ -39,199 +30,237 @@ export function Market() {
   const [keyword, setKeyword] = useState('');
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    const fetchStocks = async () => {
-      const params = new URLSearchParams();
-      if (keyword) params.set('keyword', keyword);
-      params.set('pageSize', '100');
+  const isFinancial = theme === 'financial';
+  const isCartoon = theme === 'cartoon';
+  const isMinimal = theme === 'minimal';
 
-      const res = await fetch(`/api/v1/market/stocks?${params}`);
-      const json = await res.json();
-      setStocks(json.data?.items || []);
-    };
-    fetchStocks();
+  useEffect(() => {
+    const params = new URLSearchParams();
+    if (keyword) params.set('keyword', keyword);
+    params.set('pageSize', '100');
+    fetch(`/api/v1/market/stocks?${params}`)
+      .then(r => r.json())
+      .then(j => setStocks(j.data?.items || []));
   }, [keyword]);
 
   useEffect(() => {
     if (!selectedCode) return;
-
-    const fetchData = async () => {
-      setLoading(true);
-      try {
-        const [stockRes, historyRes] = await Promise.all([
-          fetch(`/api/v1/market/stocks/${selectedCode}`),
-          fetch(`/api/v1/market/history/${selectedCode}`),
-        ]);
-
-        const stockJson = await stockRes.json();
-        const historyJson = await historyRes.json();
-
-        setSelectedStock(stockJson.data);
-        setHistoryData(historyJson.data || []);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchData();
+    setLoading(true);
+    Promise.all([
+      fetch(`/api/v1/market/stocks/${selectedCode}`).then(r => r.json()),
+      fetch(`/api/v1/market/history/${selectedCode}`).then(r => r.json()),
+    ]).then(([stockJson, historyJson]) => {
+      setSelectedStock(stockJson.data);
+      setHistoryData(historyJson.data || []);
+    }).finally(() => setLoading(false));
   }, [selectedCode]);
 
-  const handleSelectStock = (code: string) => {
-    setSearchParams({ code });
-  };
+  const fmt = (n: number | undefined, d = 2) => n != null ? n.toFixed(d) : '--';
+  const isUp = (s: Stock | null) => s?.realtime?.changePct != null && s.realtime.changePct >= 0;
 
-  const fmt = (n: number | undefined, d = 2) =>
-    n != null ? n.toFixed(d) : '--';
+  const cardClass = isFinancial ? 'glass-card' : isCartoon ? 'pixel-card' : 'swiss-card';
 
-  const isUp = (stock: Stock | null) =>
-    stock?.realtime?.changePct != null && stock.realtime.changePct >= 0;
+  // Financial theme: sidebar width 220, cartoon: 200, minimal: 80
+  const sidebarW = isMinimal ? 'w-[80px]' : isFinancial ? 'w-[220px]' : 'w-[200px]';
 
   return (
-    <div className="flex h-full" style={{ backgroundColor: 'var(--color-background)', color: 'var(--color-text)' }}>
-      {/* 左侧股票列表 */}
+    <div className="flex h-full">
+      {/* Left: Stock list */}
       <div
-        className="w-80 flex flex-col"
-        style={{ backgroundColor: 'var(--color-surface)', borderRight: '1px solid var(--color-border)' }}
+        className={`flex flex-col ${sidebarW} shrink-0`}
+        style={{
+          backgroundColor: isCartoon ? 'var(--color-surface-dark)' : 'var(--color-surface)',
+          borderRight: isCartoon ? '3px solid var(--color-border)' : (isMinimal ? 'none' : '1px solid var(--color-border)'),
+          backgroundImage: isCartoon
+            ? 'repeating-linear-gradient(90deg, transparent, transparent 23px, rgba(0,0,0,0.08) 23px, rgba(0,0,0,0.08) 25px), repeating-linear-gradient(0deg, transparent, transparent 11px, rgba(0,0,0,0.08) 11px, rgba(0,0,0,0.08) 13px)'
+            : isFinancial
+            ? 'linear-gradient(180deg, rgba(59,130,246,0.03) 0%, transparent 100%)'
+            : undefined,
+          backdropFilter: isFinancial ? 'blur(12px)' : undefined,
+        }}
       >
-        <div className="p-4" style={{ borderBottom: '1px solid var(--color-border)' }}>
-          <input
-            type="text"
-            placeholder="搜索股票代码或名称..."
-            value={keyword}
-            onChange={(e) => setKeyword(e.target.value)}
-            className="w-full px-3 py-2 border rounded text-sm"
-            style={{
-              backgroundColor: 'var(--color-background)',
-              color: 'var(--color-text)',
-              borderColor: 'var(--color-border)',
-            }}
-          />
+        {/* Search */}
+        <div className="p-3" style={{ borderBottom: isCartoon ? '3px solid var(--color-border)' : '1px solid var(--color-border)' }}>
+          {isCartoon ? (
+            <input
+              type="text" placeholder="搜索..." value={keyword} onChange={e => setKeyword(e.target.value)}
+              className="w-full px-2 py-2 border-2"
+              style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)', color: 'var(--color-text)', fontFamily: 'var(--font-mono)', fontSize: 8 }}
+            />
+          ) : isMinimal ? (
+            <input
+              type="text" placeholder="搜索" value={keyword} onChange={e => setKeyword(e.target.value)}
+              className="w-full px-2 py-2"
+              style={{ background: 'transparent', borderBottom: '1px solid var(--color-border)', borderTop: 'none', borderLeft: 'none', borderRight: 'none', color: 'var(--color-text)', fontFamily: 'var(--font-mono)', fontSize: 12 }}
+            />
+          ) : (
+            <input
+              type="text" placeholder="搜索股票代码或名称..." value={keyword} onChange={e => setKeyword(e.target.value)}
+              className="w-full px-3 py-2 rounded"
+              style={{ background: 'rgba(59,130,246,0.06)', border: '1px solid var(--color-border)', color: 'var(--color-text)', fontSize: 13 }}
+            />
+          )}
         </div>
+
+        {/* List */}
         <div className="flex-1 overflow-y-auto">
-          {stocks.map((stock) => (
-            <div
-              key={stock.code}
-              onClick={() => handleSelectStock(stock.code)}
-              className="p-3 cursor-pointer transition-colors duration-150"
-              style={{
-                borderBottom: '1px solid var(--color-border)',
-                backgroundColor: selectedCode === stock.code ? 'var(--color-primary)' + '20' : 'transparent',
-              }}
-              onMouseEnter={(e) => {
-                if (selectedCode !== stock.code) {
-                  e.currentTarget.style.backgroundColor = 'rgba(59, 130, 246, 0.08)';
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (selectedCode !== stock.code) {
-                  e.currentTarget.style.backgroundColor = 'transparent';
-                }
-              }}
-            >
-              <div className="flex justify-between items-center">
-                <span className="font-medium text-sm" style={{ color: 'var(--color-text)' }}>
-                  {stock.name}
-                </span>
-                <span
-                  className="text-xs font-mono"
-                  style={{ color: 'var(--color-text-secondary)' }}
-                >
-                  {stock.code}
-                </span>
-              </div>
-              {stock.realtime && (
-                <div className="flex justify-between items-center mt-1">
+          {stocks.map((stock) => {
+            const active = selectedCode === stock.code;
+            const up = isUp(stock);
+            return (
+              <div
+                key={stock.code}
+                onClick={() => setSearchParams({ code: stock.code })}
+                className="cursor-pointer transition-all duration-150"
+                style={{
+                  padding: isCartoon ? '10px 12px' : isMinimal ? '16px 8px' : '12px 16px',
+                  borderBottom: isCartoon ? '2px solid rgba(255,215,0,0.15)' : (isMinimal ? '1px solid #E5E5E5' : '1px solid var(--color-border)'),
+                  backgroundColor: active
+                    ? (isCartoon ? 'rgba(255,215,0,0.2)' : (isMinimal ? 'var(--color-surface)' : 'rgba(59,130,246,0.12)'))
+                    : 'transparent',
+                  borderLeft: active && isFinancial ? '3px solid var(--color-primary)' : (active && isCartoon ? '3px solid var(--color-primary)' : 'none'),
+                }}
+              >
+                <div className="flex justify-between items-center">
                   <span
-                    className="text-sm font-bold"
-                    style={{ color: isUp(stock) ? 'var(--color-up)' : 'var(--color-down)' }}
-                  >
-                    {fmt(stock.realtime.price)}
-                  </span>
-                  <span
-                    className="text-xs px-1.5 py-0.5 rounded font-mono"
                     style={{
-                      color: '#fff',
-                      backgroundColor: isUp(stock) ? 'var(--color-up)' : 'var(--color-down)',
+                      fontFamily: isCartoon ? 'var(--font-heading)' : (isMinimal ? 'var(--font-heading)' : 'var(--font-body)'),
+                      fontSize: isCartoon ? 8 : (isMinimal ? 18 : 14),
+                      fontWeight: isMinimal ? 400 : 600,
+                      color: 'var(--color-text)',
+                      letterSpacing: isMinimal ? '0.1em' : undefined,
                     }}
                   >
-                    {isUp(stock) ? '+' : ''}{fmt(stock.realtime.changePct)}%
+                    {isMinimal ? stock.code : stock.name}
                   </span>
+                  {isCartoon ? (
+                    <span className="price-tag" style={{ color: up ? 'var(--color-up)' : 'var(--color-down)', borderColor: 'var(--color-border)' }}>
+                      {up ? '+' : ''}{fmt(stock.realtime?.changePct)}%
+                    </span>
+                  ) : isMinimal ? (
+                    <span className="mono" style={{ fontSize: 12, color: up ? 'var(--color-up)' : 'var(--color-down)', fontWeight: 500 }}>
+                      {up ? '+' : ''}{fmt(stock.realtime?.changePct)}%
+                    </span>
+                  ) : (
+                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: up ? 'var(--color-up)' : 'var(--color-down)', fontWeight: 600 }}>
+                      {up ? '+' : ''}{fmt(stock.realtime?.price)}
+                    </span>
+                  )}
                 </div>
-              )}
-            </div>
-          ))}
-          {stocks.length === 0 && (
-            <div className="p-8 text-center" style={{ color: 'var(--color-text-secondary)' }}>
-              暂无数据
-            </div>
-          )}
+                {!isMinimal && (
+                  <div className="flex justify-between items-center mt-1">
+                    {isCartoon ? (
+                      <span style={{ fontFamily: 'var(--font-mono)', fontSize: 6, color: 'var(--color-primary)' }}>
+                        {stock.code}
+                      </span>
+                    ) : (
+                      <>
+                        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--color-text-secondary)' }}>
+                          {stock.code}
+                        </span>
+                        <span
+                          style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: up ? 'var(--color-up)' : 'var(--color-down)', padding: '1px 6px', borderRadius: 2, background: up ? 'rgba(239,68,68,0.12)' : 'rgba(16,185,129,0.12)' }}
+                        >
+                          {up ? '+' : ''}{fmt(stock.realtime?.changePct)}%
+                        </span>
+                      </>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       </div>
 
-      {/* 右侧详情 */}
-      <div className="flex-1 flex flex-col overflow-y-auto" style={{ backgroundColor: 'var(--color-background)' }}>
+      {/* Right: Detail */}
+      <div className="flex-1 overflow-y-auto" style={{ backgroundColor: 'var(--color-background)' }}>
         {selectedStock ? (
           <div className="p-6">
-            {/* 头部信息 */}
+            {/* Header */}
             <div className="mb-6">
-              <div className="flex items-baseline gap-3">
-                <h1 className="text-2xl font-bold" style={{ color: 'var(--color-text)' }}>
-                  {selectedStock.name}
-                </h1>
-                <span className="text-sm" style={{ color: 'var(--color-text-secondary)' }}>
-                  {selectedStock.code} · {selectedStock.market === 'SH' ? '上证' : '深证'}
-                </span>
-              </div>
-              {selectedStock.industry && (
-                <span
-                  className="inline-block mt-1 text-xs px-2 py-0.5 rounded"
-                  style={{ backgroundColor: 'var(--color-surface)', color: 'var(--color-text-secondary)' }}
-                >
-                  {selectedStock.industry}
-                </span>
+              {isMinimal ? (
+                <div>
+                  <div className="page-title">{selectedStock.code}</div>
+                  <div style={{ fontFamily: 'var(--font-heading)', fontSize: 48, letterSpacing: '0.05em', color: 'var(--color-text)', lineHeight: 1 }}>
+                    {selectedStock.name}
+                  </div>
+                </div>
+              ) : (
+                <div>
+                  <div className="flex items-baseline gap-3">
+                    <h1 className={isFinancial ? 'page-title mb-0' : (isCartoon ? 'page-title mb-2' : 'page-title mb-0')}>
+                      {selectedStock.name}
+                    </h1>
+                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: isCartoon ? 8 : 13, color: 'var(--color-text-secondary)' }}>
+                      {selectedStock.code} · {selectedStock.market === 'SH' ? '上证' : '深证'}
+                    </span>
+                  </div>
+                  {/* Price hero */}
+                  <div className="flex items-end gap-4 mt-3">
+                    <span
+                      style={{
+                        fontFamily: isCartoon ? 'var(--font-mono)' : 'var(--font-mono)',
+                        fontSize: isCartoon ? 12 : 36,
+                        fontWeight: 700,
+                        color: isUp(selectedStock) ? 'var(--color-up)' : 'var(--color-down)',
+                      }}
+                    >
+                      {fmt(selectedStock.realtime?.price)}
+                    </span>
+                    <span
+                      style={{
+                        fontFamily: 'var(--font-mono)',
+                        fontSize: isCartoon ? 8 : 16,
+                        color: isUp(selectedStock) ? 'var(--color-up)' : 'var(--color-down)',
+                        marginBottom: isCartoon ? 2 : 4,
+                      }}
+                    >
+                      {isUp(selectedStock) ? '▲' : '▼'} {isUp(selectedStock) ? '+' : ''}{fmt(selectedStock.realtime?.change)} ({isUp(selectedStock) ? '+' : ''}{fmt(selectedStock.realtime?.changePct)}%)
+                    </span>
+                  </div>
+                </div>
               )}
             </div>
 
-            {/* K线图 */}
-            {loading ? (
-              <div
-                className="flex items-center justify-center rounded"
-                style={{ height: '500px', backgroundColor: 'var(--color-surface)' }}
-              >
-                <span style={{ color: 'var(--color-text-secondary)' }}>加载中...</span>
-              </div>
-            ) : (
-              <div
-                className="rounded p-4 mb-6"
-                style={{ backgroundColor: 'var(--color-surface)' }}
-              >
-                <KLineChart data={historyData} height={450} />
-              </div>
-            )}
+            {/* Chart */}
+            <div className={`${cardClass} p-4 mb-6`} style={isCartoon ? { boxShadow: '4px 4px 0px var(--color-border)' } : (isFinancial ? { backdropFilter: 'blur(12px)' } : { borderTop: '4px solid var(--color-border)' })}>
+              {loading ? (
+                <div className="flex items-center justify-center" style={{ height: isMinimal ? 300 : 450, color: 'var(--color-text-secondary)' }}>
+                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}>加载中...</span>
+                </div>
+              ) : (
+                <KLineChart data={historyData} height={isMinimal ? 300 : 450} />
+              )}
+            </div>
 
-            {/* 行情数据 */}
-            <div className="grid grid-cols-4 gap-4">
+            {/* Stats grid */}
+            <div className={`${isMinimal ? 'swiss-grid' : 'grid grid-cols-4 gap-4'}`}>
               {[
-                { label: '最新价', value: fmt(selectedStock.realtime?.price), up: isUp(selectedStock) },
-                { label: '涨跌幅', value: `${isUp(selectedStock) ? '+' : ''}${fmt(selectedStock.realtime?.changePct)}%`, up: isUp(selectedStock) },
-                { label: '涨跌额', value: `${isUp(selectedStock) ? '+' : ''}${fmt(selectedStock.realtime?.change)}`, up: isUp(selectedStock) },
-                { label: '今开', value: fmt(selectedStock.realtime?.open) },
+                { label: '开盘', value: fmt(selectedStock.realtime?.open) },
                 { label: '昨收', value: fmt(selectedStock.realtime?.prevClose) },
-                { label: '最高', value: fmt(selectedStock.realtime?.high) },
-                { label: '最低', value: fmt(selectedStock.realtime?.low) },
-                { label: '成交量', value: fmt(selectedStock.realtime?.volume, 0) + ' 股' },
+                { label: '最高', value: fmt(selectedStock.realtime?.high), up: true },
+                { label: '最低', value: fmt(selectedStock.realtime?.low), down: true },
+                { label: '成交量', value: (selectedStock.realtime?.volume ? (selectedStock.realtime.volume / 100000000).toFixed(2) + '亿' : '--') },
+                { label: '成交额', value: (selectedStock.realtime?.amount ? (selectedStock.realtime.amount / 100000000).toFixed(2) + '亿' : '--') },
+                { label: '涨跌额', value: `${isUp(selectedStock) ? '+' : ''}${fmt(selectedStock.realtime?.change)}`, up: isUp(selectedStock), down: !isUp(selectedStock) },
+                { label: '涨跌幅', value: `${isUp(selectedStock) ? '+' : ''}${fmt(selectedStock.realtime?.changePct)}%`, up: isUp(selectedStock), down: !isUp(selectedStock) },
               ].map((item) => (
                 <div
                   key={item.label}
-                  className="p-4 rounded"
-                  style={{ backgroundColor: 'var(--color-surface)' }}
+                  className={isCartoon ? 'pixel-card p-3' : ''}
+                  style={isCartoon ? { boxShadow: '2px 2px 0px var(--color-border)' } : (isMinimal ? { padding: '16px' } : { padding: '16px', backgroundColor: 'var(--color-surface)', borderRadius: 4, border: '1px solid var(--color-border)' })}
                 >
-                  <div className="text-xs mb-1" style={{ color: 'var(--color-text-secondary)' }}>
+                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: isCartoon ? 6 : (isMinimal ? 10 : 11), color: 'var(--color-text-secondary)', marginBottom: 4 }}>
                     {item.label}
                   </div>
                   <div
-                    className="text-lg font-bold font-mono"
-                    style={{ color: item.up !== undefined ? (item.up ? 'var(--color-up)' : 'var(--color-down)') : 'var(--color-text)' }}
+                    style={{
+                      fontFamily: 'var(--font-mono)',
+                      fontSize: isCartoon ? 8 : (isMinimal ? 14 : 16),
+                      fontWeight: isCartoon ? 400 : 600,
+                      color: item.up ? 'var(--color-up)' : (item.down ? 'var(--color-down)' : 'var(--color-text)'),
+                    }}
                   >
                     {item.value}
                   </div>
@@ -240,13 +269,14 @@ export function Market() {
             </div>
           </div>
         ) : (
-          <div
-            className="flex-1 flex items-center justify-center"
-            style={{ color: 'var(--color-text-secondary)' }}
-          >
+          <div className="flex items-center justify-center h-full" style={{ color: 'var(--color-text-secondary)' }}>
             <div className="text-center">
-              <div className="text-4xl mb-2">📈</div>
-              <div>请选择一只股票查看详情</div>
+              <div style={{ fontSize: isCartoon ? 16 : 48, marginBottom: 8, opacity: 0.3 }}>
+                {isCartoon ? '★' : (isMinimal ? '·' : '◉')}
+              </div>
+              <div style={{ fontFamily: isCartoon ? 'var(--font-heading)' : 'var(--font-body)', fontSize: isCartoon ? 8 : 14 }}>
+                请选择一只股票查看详情
+              </div>
             </div>
           </div>
         )}
