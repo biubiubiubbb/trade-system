@@ -1,0 +1,235 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// 股票基本信息
+model Stock {
+  code      String   @id
+  name      String
+  market    String   // SH/SZ
+  industry  String?
+  listDate  DateTime?
+
+  history   HistoryData[]
+  realtime  RealtimeData?
+}
+
+// 历史行情数据
+model HistoryData {
+  id        Int      @id @default(autoincrement())
+  code      String
+  date      DateTime
+  open      Float
+  high      Float
+  low       Float
+  close     Float
+  volume    Float
+  amount    Float
+  turnover  Float?
+  adjust    String   @default("None")
+
+  stock     Stock    @relation(fields: [code], references: [code])
+
+  @@unique([code, date, adjust])
+  @@index([code, date])
+}
+
+// 实时行情数据
+model RealtimeData {
+  code        String   @id
+  price       Float
+  change      Float
+  changePct   Float
+  volume      Float
+  amount      Float
+  high        Float
+  low         Float
+  open        Float
+  prevClose   Float
+  bid1        Float
+  ask1        Float
+  updatedAt   DateTime @updatedAt
+
+  stock       Stock    @relation(fields: [code], references: [code])
+}
+
+// 账户
+model Account {
+  id          String    @id @default(uuid())
+  name        String
+  initialFund Decimal   @default(100000) @db.Decimal(18, 2)
+  cash        Decimal   @db.Decimal(18, 2)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  positions   Position[]
+  trades      Trade[]
+  stats       AccountStats?
+}
+
+// 账户统计
+model AccountStats {
+  id              String   @id @default(uuid())
+  accountId       String   @unique
+  totalValue      Decimal  @db.Decimal(18, 2)
+  profit          Decimal  @db.Decimal(18, 2)
+  profitPct       Float
+  winCount        Int      @default(0)
+  lossCount       Int      @default(0)
+  maxDrawdown     Float    @default(0)
+  updatedAt       DateTime @updatedAt
+
+  account         Account  @relation(fields: [accountId], references: [id])
+}
+
+// 持仓
+model Position {
+  id          String   @id @default(uuid())
+  accountId   String
+  code        String
+  name        String
+  quantity    Int
+  avgCost     Decimal  @db.Decimal(18, 4)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  account     Account  @relation(fields: [accountId], references: [id])
+
+  @@unique([accountId, code])
+  @@index([accountId])
+}
+
+// 交易记录
+model Trade {
+  id          String      @id @default(uuid())
+  accountId   String
+  code        String
+  name        String
+  type        TradeType
+  price       Decimal     @db.Decimal(18, 4)
+  quantity    Int
+  amount      Decimal     @db.Decimal(18, 2)
+  fee         Decimal     @db.Decimal(18, 2)
+  timestamp   DateTime    @default(now())
+
+  account     Account     @relation(fields: [accountId], references: [id])
+
+  @@index([accountId, timestamp])
+  @@index([accountId])
+}
+
+enum TradeType {
+  BUY
+  SELL
+}
+
+// 策略
+model Strategy {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  config      Json
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  backtests   Backtest[]
+}
+
+// 回测任务
+model Backtest {
+  id          String         @id @default(uuid())
+  strategyId  String
+  accountId   String
+  startDate   DateTime
+  endDate     DateTime
+  status      BacktestStatus @default(PENDING)
+  result      Json?
+  createdAt   DateTime       @default(now())
+  completedAt DateTime?
+
+  strategy    Strategy       @relation(fields: [strategyId], references: [id])
+}
+
+enum BacktestStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+}
+
+// 交易笔记
+model Note {
+  id        String   @id @default(uuid())
+  title     String
+  content   String   @db.Text
+  type      NoteType
+  tags      String    @db.Text
+  tradeId   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+enum NoteType {
+  DAILY_REVIEW
+  TRADE_REFLECTION
+  STRATEGY_REVIEW
+  LEARNING
+  MISC
+}
+
+// 通知
+model Notification {
+  id        String           @id @default(uuid())
+  type      NotificationType
+  title     String
+  content   String
+  data      Json?
+  isRead    Boolean         @default(false)
+  createdAt DateTime        @default(now())
+}
+
+enum NotificationType {
+  PRICE_ALERT
+  PROFIT_ALERT
+  LOSS_ALERT
+  SYSTEM
+}
+
+// 自选股
+model Watchlist {
+  id        String           @id @default(uuid())
+  name      String
+  userId    String          @default("default")
+  createdAt DateTime        @default(now())
+
+  stocks    WatchlistStock[]
+}
+
+model WatchlistStock {
+  watchlistId String
+  stockCode  String
+  sortOrder  Int      @default(0)
+
+  watchlist  Watchlist @relation(fields: [watchlistId], references: [id], onDelete: Cascade)
+
+  @@id([watchlistId, stockCode])
+}
+
+// 系统设置
+model Settings {
+  id                 String   @id @default("default")
+  theme              String   @default("financial")
+  shortcuts          Json?
+  stampTax           Float    @default(0.001)
+  commission         Float    @default(0.0003)
+  minCommission      Float    @default(5)
+  transferFee        Float    @default(0.00002)
+  defaultSlippage    Float    @default(0)
+  dataUpdateInterval Int      @default(60)
+  updatedAt          DateTime @updatedAt
+}
