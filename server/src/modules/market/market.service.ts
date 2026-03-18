@@ -44,7 +44,7 @@ export class MarketService {
   async getHistory(query: HistoryQueryDto) {
     const { code, startDate, endDate, adjust = 'None' } = query;
 
-    const where: any = { code, adjust };
+    const where: any = { code, adjust, date: {} };
     if (startDate) where.date.gte = new Date(startDate);
     if (endDate) where.date.lte = new Date(endDate);
 
