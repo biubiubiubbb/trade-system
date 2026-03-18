@@ -1,0 +1,33 @@
+# Dependencies
+node_modules/
+
+# Build
+dist/
+
+# IDE
+.idea/
+.vscode/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+
+# OS
+.DS_Store
+
+# Prisma
+prisma/*.db
+prisma/*.db-journal
+
+# Coverage
+coverage/
+
+# Temporary
+tmp/
+temp/
