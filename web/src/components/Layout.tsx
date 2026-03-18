@@ -1,5 +1,4 @@
 import { Outlet, Link, useLocation } from 'react-router-dom';
-import { useTheme } from '../theme/ThemeContext';
 
 const navItems = [
   { path: '/', label: '仪表盘' },
@@ -12,7 +11,6 @@ const navItems = [
 
 export function Layout() {
   const location = useLocation();
-  const { theme } = useTheme();
 
   const asideStyle: React.CSSProperties = {
     backgroundColor: 'var(--color-surface)',

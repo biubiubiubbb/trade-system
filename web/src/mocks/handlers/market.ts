@@ -1,20 +1,21 @@
 import { http, HttpResponse } from 'msw';
+import { faker } from '@faker-js/faker';
 import { mockStocks, mockHistoryData } from '../data/stocks';
 
 const generateRealtime = (code: string, name: string) => ({
   code,
   name,
-  price: 50 + Math.random() * 10,
-  change: (Math.random() - 0.5) * 5,
-  changePct: (Math.random() - 0.5) * 10,
-  volume: Math.random() * 100000000,
-  amount: Math.random() * 1000000000,
-  high: 50 + Math.random() * 15,
-  low: 50 - Math.random() * 5,
-  open: 50 + Math.random() * 3,
-  prevClose: 50,
-  bid1: 50 - 0.01,
-  ask1: 50 + 0.01,
+  price: faker.number.float({ min: 10, max: 100, fractionDigits: 2 }),
+  change: faker.number.float({ min: -5, max: 5, fractionDigits: 2 }),
+  changePct: faker.number.float({ min: -10, max: 10, fractionDigits: 2 }),
+  volume: faker.number.float({ min: 1000000, max: 100000000 }),
+  amount: faker.number.float({ min: 10000000, max: 1000000000 }),
+  high: faker.number.float({ min: 50, max: 110, fractionDigits: 2 }),
+  low: faker.number.float({ min: 5, max: 50, fractionDigits: 2 }),
+  open: faker.number.float({ min: 10, max: 100, fractionDigits: 2 }),
+  prevClose: faker.number.float({ min: 10, max: 100, fractionDigits: 2 }),
+  bid1: faker.number.float({ min: 10, max: 100, fractionDigits: 2 }),
+  ask1: faker.number.float({ min: 10, max: 100, fractionDigits: 2 }),
   updatedAt: new Date().toISOString(),
 });
 
@@ -71,6 +72,38 @@ export const marketHandlers = [
       code: 0,
       message: 'success',
       data: generateRealtime(params.code as string, stock?.name || 'Unknown'),
+    });
+  }),
+
+  http.get('/api/v1/market/realtime/batch', ({ request }) => {
+    const url = new URL(request.url);
+    const codes = url.searchParams.get('codes')?.split(',') || [];
+    return HttpResponse.json({
+      code: 0,
+      message: 'success',
+      data: codes.map((code) => {
+        const stock = mockStocks.find((s) => s.code === code);
+        return generateRealtime(code, stock?.name || 'Unknown');
+      }),
+    });
+  }),
+
+  http.get('/api/v1/market/rankings', ({ request }) => {
+    const url = new URL(request.url);
+    const limit = parseInt(url.searchParams.get('limit') || '50');
+    const type = url.searchParams.get('type') || 'up';
+
+    const stocks = mockStocks.slice(0, limit).map((s) => ({
+      ...s,
+      realtime: generateRealtime(s.code, s.name),
+    }));
+
+    return HttpResponse.json({
+      code: 0,
+      message: 'success',
+      data: type === 'up'
+        ? stocks.sort((a, b) => b.realtime.changePct - a.realtime.changePct)
+        : stocks.sort((a, b) => a.realtime.changePct - b.realtime.changePct),
     });
   }),
 ];
