@@ -1,11 +1,15 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
+import { RedisService } from '../../services/redis.service';
 import { StockListQueryDto } from './dto/stock.dto';
 import { HistoryQueryDto } from './dto/history-query.dto';
 
 @Injectable()
 export class MarketService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly redis: RedisService,
+  ) {}
 
   async getStockList(query: StockListQueryDto) {
     const { keyword, market, industry, page = 1, pageSize = 20 } = query;
@@ -51,7 +55,23 @@ export class MarketService {
   }
 
   async getRealtime(code: string) {
-    return this.prisma.realtimeData.findUnique({ where: { code } });
+    const cacheKey = `realtime:${code}`;
+    const cached = await this.redis.get(cacheKey);
+
+    if (cached) {
+      return JSON.parse(cached);
+    }
+
+    const realtime = await this.prisma.realtimeData.findUnique({
+      where: { code },
+    });
+
+    if (realtime) {
+      await this.redis.set(cacheKey, JSON.stringify(realtime), 60);
+      return realtime;
+    }
+
+    return null;
   }
 
   async getRealtimeBatch(codes: string[]) {
