@@ -1,0 +1,22 @@
+{
+  "name": "trade-system",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "pnpm -r --parallel dev",
+    "build": "pnpm -r build",
+    "lint": "pnpm -r lint",
+    "test": "pnpm -r test",
+    "dev:server": "pnpm --filter @trade-system/server dev",
+    "dev:web": "pnpm --filter @trade-system/web dev",
+    "docker:up": "cd server && docker-compose up -d",
+    "docker:down": "cd server && docker-compose down"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.3"
+  },
+  "packages": [
+    "server",
+    "web"
+  ]
+}
