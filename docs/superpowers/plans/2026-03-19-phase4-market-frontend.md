@@ -190,7 +190,7 @@ export const marketApi = {
 
   // 分钟级数据
   getMinute: (code: string, period: string = '5') =>
-    api<{ data: { time: string; price: number; volume: number }[] }>(
+    api<{ data: { time: string; price: number; volume: number; amount: number }[] }>(
       `/minute/${code}?period=${period}`
     ).then((r) => r.data),
 
@@ -279,6 +279,7 @@ http.get('/api/v1/market/minute/:code', ({ params }) => {
     time: new Date(now - i * 60000 * 5).toISOString(),
     price: 10 + Math.random() * 2,
     volume: Math.floor(Math.random() * 10000),
+    amount: Math.floor(Math.random() * 100000),
   })).reverse();
   return HttpResponse.json({ code: 0, message: 'success', data });
 }),
@@ -437,7 +438,7 @@ export function useRealtimeSSE(codes: string[]) {
 ```typescript
 // web/src/hooks/useBidAsk.ts
 import { useState, useEffect, useRef } from 'react';
-import { BidAsk } from '../services/marketApi';
+import { marketApi, BidAsk } from '../services/marketApi';
 
 export function useBidAsk(code: string | null, intervalMs: number = 3000) {
   const [data, setData] = useState<BidAsk | null>(null);
@@ -447,10 +448,9 @@ export function useBidAsk(code: string | null, intervalMs: number = 3000) {
   const fetchBidAsk = async () => {
     if (!code) return;
     try {
-      const res = await fetch(`/api/v1/market/realtime/${code}`);
-      const json = await res.json();
-      if (json.data?.bidAsk) {
-        setData(json.data.bidAsk);
+      const realtime = await marketApi.getRealtime(code);
+      if (realtime?.bidAsk) {
+        setData(realtime.bidAsk);
       }
     } catch {
       // ignore
