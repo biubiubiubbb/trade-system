@@ -7,6 +7,11 @@ import { useRealtimeSSE } from '../hooks/useRealtimeSSE';
 import { useBidAsk } from '../hooks/useBidAsk';
 import { BidAskPanel } from '../components/market/BidAskPanel';
 import { RealtimeTicker } from '../components/market/RealtimeTicker';
+import { SectorList } from '../components/market/SectorList';
+import { LimitUpList } from '../components/market/LimitUpList';
+import { BoardHistoryModal } from '../components/market/BoardHistoryModal';
+import * as Tabs from '@radix-ui/react-tabs';
+import * as Select from '@radix-ui/react-select';
 
 interface Stock {
   code: string;
@@ -86,6 +91,21 @@ export function Market() {
   const [keyword, setKeyword] = useState('');
   const [loading, setLoading] = useState(false);
 
+  // Tab state for sector and limitup
+  const [activeTab, setActiveTab] = useState<'market' | 'sector' | 'limitup'>('market');
+  const [sectorType, setSectorType] = useState<'industry' | 'concept'>('industry');
+  const [limitUpType, setLimitUpType] = useState<'up' | 'previous' | 'subnew' | 'broken' | 'down'>('up');
+  const [selectedBoard, setSelectedBoard] = useState<{ name: string; type: 'concept' | 'industry' } | null>(null);
+
+  // LimitUp type labels
+  const limitUpTypeLabels = {
+    up: '今日涨停',
+    previous: '昨日涨停',
+    subnew: '次新股',
+    broken: '炸板股',
+    down: '跌停股',
+  } as const;
+
   const isFinancial = theme === 'financial';
   const isCartoon = theme === 'cartoon';
   const isMinimal = theme === 'minimal';
@@ -135,7 +155,7 @@ export function Market() {
 
   return (
     <div className="flex h-full">
-      {/* Left: Stock list */}
+      {/* Left: Tabbed content */}
       <div
         className={`flex flex-col ${sidebarW} shrink-0`}
         style={{
@@ -177,23 +197,147 @@ export function Market() {
           )}
         </div>
 
-        {/* List - using RealtimeTicker */}
-        <div className="flex-1 overflow-y-auto">
-          {stocks.map((stock) => {
-            const realtime = realtimeMap.get(stock.code) || stock.realtime;
-            return (
-              <RealtimeTicker
-                key={stock.code}
-                code={stock.code}
-                name={stock.name}
-                industry={stock.industry}
-                realtime={realtime}
-                selected={selectedCode === stock.code}
-                onClick={() => setSearchParams({ code: stock.code })}
+        {/* Tab Navigation + Content */}
+        <Tabs.Root value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="flex flex-col flex-1 overflow-hidden">
+          {/* Tab List */}
+          <Tabs.List
+            className="flex shrink-0"
+            style={{ borderBottom: isCartoon ? '3px solid var(--color-border)' : '1px solid var(--color-border)' }}
+          >
+            {[
+              { value: 'market', label: '行情' },
+              { value: 'sector', label: '板块' },
+              { value: 'limitup', label: '涨停' },
+            ].map((tab) => (
+              <Tabs.Trigger
+                key={tab.value}
+                value={tab.value}
+                className="flex-1 py-2 text-xs transition-colors duration-200 relative"
+                style={{
+                  color: 'var(--color-text-secondary)',
+                  backgroundColor: 'transparent',
+                }}
+              >
+                {tab.label}
+                {activeTab === tab.value && (
+                  <div
+                    className="absolute bottom-0 left-0 right-0 h-0.5"
+                    style={{
+                      backgroundColor: isFinancial ? '#3B82F6' : (isCartoon ? 'var(--color-border)' : '#000'),
+                    }}
+                  />
+                )}
+              </Tabs.Trigger>
+            ))}
+          </Tabs.List>
+
+          {/* Market Tab Content */}
+          <Tabs.Content value="market" className="flex-1 overflow-y-auto">
+            {stocks.map((stock) => {
+              const realtime = realtimeMap.get(stock.code) || stock.realtime;
+              return (
+                <RealtimeTicker
+                  key={stock.code}
+                  code={stock.code}
+                  name={stock.name}
+                  industry={stock.industry}
+                  realtime={realtime}
+                  selected={selectedCode === stock.code}
+                  onClick={() => setSearchParams({ code: stock.code })}
+                />
+              );
+            })}
+          </Tabs.Content>
+
+          {/* Sector Tab Content */}
+          <Tabs.Content value="sector" className="flex-1 flex flex-col overflow-hidden">
+            {/* 行业/概念切换 */}
+            <div className="flex shrink-0" style={{ borderBottom: '1px solid var(--color-border)' }}>
+              <button
+                className={`flex-1 py-2 text-xs transition-colors ${sectorType === 'industry' ? 'bg-blue-100 dark:bg-blue-900/30' : ''}`}
+                style={{ color: sectorType === 'industry' ? 'var(--color-primary)' : 'var(--color-text-secondary)' }}
+                onClick={() => setSectorType('industry')}
+              >
+                行业
+              </button>
+              <button
+                className={`flex-1 py-2 text-xs transition-colors ${sectorType === 'concept' ? 'bg-blue-100 dark:bg-blue-900/30' : ''}`}
+                style={{ color: sectorType === 'concept' ? 'var(--color-primary)' : 'var(--color-text-secondary)' }}
+                onClick={() => setSectorType('concept')}
+              >
+                概念
+              </button>
+            </div>
+            {/* 板块列表 */}
+            <div className="flex-1 overflow-hidden">
+              <SectorList
+                type={sectorType}
+                onBoardClick={(name) => setSelectedBoard({ name, type: sectorType })}
               />
-            );
-          })}
-        </div>
+            </div>
+          </Tabs.Content>
+
+          {/* LimitUp Tab Content */}
+          <Tabs.Content value="limitup" className="flex-1 flex flex-col overflow-hidden">
+            {/* 股池类型选择 */}
+            <div className="p-2 shrink-0" style={{ borderBottom: '1px solid var(--color-border)' }}>
+              <Select.Root
+                value={limitUpType}
+                onValueChange={(v) => setLimitUpType(v as any)}
+              >
+                <Select.Trigger
+                  className="w-full px-3 py-2 text-xs rounded flex items-center justify-between"
+                  style={{
+                    backgroundColor: 'var(--color-surface)',
+                    border: isCartoon ? '2px solid var(--color-border)' : '1px solid var(--color-border)',
+                    color: 'var(--color-text)',
+                  }}
+                >
+                  <Select.Value />
+                  <Select.Icon>
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </Select.Icon>
+                </Select.Trigger>
+                <Select.Portal>
+                  <Select.Content
+                    className="overflow-hidden rounded shadow-lg"
+                    style={{
+                      backgroundColor: 'var(--color-surface)',
+                      border: '1px solid var(--color-border)',
+                    }}
+                  >
+                    <Select.Viewport className="p-1">
+                      {(['up', 'previous', 'subnew', 'broken', 'down'] as const).map((t) => (
+                        <Select.Item
+                          key={t}
+                          value={t}
+                          className="px-3 py-2 text-xs cursor-pointer rounded outline-none transition-colors"
+                          style={{ color: 'var(--color-text)' }}
+                          onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'var(--color-primary)')}
+                          onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+                        >
+                          <Select.ItemText>{limitUpTypeLabels[t]}</Select.ItemText>
+                        </Select.Item>
+                      ))}
+                    </Select.Viewport>
+                  </Select.Content>
+                </Select.Portal>
+              </Select.Root>
+            </div>
+            {/* 涨停板列表 */}
+            <div className="flex-1 overflow-hidden">
+              <LimitUpList
+                type={limitUpType}
+                onStockClick={(code) => {
+                  setSearchParams({ code });
+                  setActiveTab('market');
+                }}
+              />
+            </div>
+          </Tabs.Content>
+        </Tabs.Root>
       </div>
 
       {/* Right: Detail */}
@@ -339,6 +483,14 @@ export function Market() {
           </div>
         )}
       </div>
+
+      {/* Board History Modal */}
+      <BoardHistoryModal
+        open={!!selectedBoard}
+        boardName={selectedBoard?.name || ''}
+        boardType={selectedBoard?.type || 'industry'}
+        onClose={() => setSelectedBoard(null)}
+      />
     </div>
   );
 }
