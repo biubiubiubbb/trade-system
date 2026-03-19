@@ -1,8 +1,8 @@
 # 行情模块重构设计方案
 
 > **创建时间：** 2026-03-19
-> **状态：** 待评审
-> **版本：** v1.0
+> **状态：** 已评审
+> **版本：** v1.1
 
 ## 1. 背景与目标
 
@@ -168,9 +168,11 @@ model LimitUpStock {
 
 #### Stock（扩展字段）
 
+> **说明：** 现有字段包括 `code`(PK), `name`, `market`, `industry?`, `history`, `realtime`。以下为新增/扩展字段：
+
 ```prisma
 model Stock {
-  // ... 现有字段 ...
+  // 现有字段 code, name, market, industry?, history, realtime...
   totalShares    Float?    // 总股本
   floatShares    Float?    // 流通股本
   listDate       DateTime? // 上市日期
@@ -183,9 +185,11 @@ model Stock {
 
 #### RealtimeData（增强字段）
 
+> **说明：** 现有字段包括 `code`(PK), `price`, `change`, `changePct`, `volume`, `amount`, `high`, `low`, `open`, `prevClose`, `bid1`, `ask1`, `updatedAt`。以下为新增字段：
+
 ```prisma
 model RealtimeData {
-  // ... 现有字段 ...
+  // 现有字段 code, price, change, changePct, volume, amount, high, low, open, prevClose, bid1, ask1, updatedAt...
   amplitude      Float?    // 振幅 (%)
   turnoverRate   Float?    // 换手率 (%)
   pe             Float?    // 市盈率（动态）
@@ -258,6 +262,8 @@ export class RealtimePushService {
   }
 
   // 获取订阅者数据（从 Redis 批量读取）
+  // Redis Key 策略: `realtime:{code}` → TTL: 120秒
+  // 数据格式: JSON string of RealtimeUpdate
   getSnapshot(codes: string[]): RealtimeUpdate[]
 }
 ```
@@ -400,6 +406,14 @@ function useRealtimeSSE(codes: string[]) {
       setData(prev => new Map(prev).set(update.code, update));
     };
 
+    // 断线自动重连
+    eventSource.onerror = () => {
+      eventSource.close();
+      setTimeout(() => {
+        // React 会自动重新触发 useEffect，重新创建连接
+      }, 3000);
+    };
+
     return () => eventSource.close();
   }, [codes]);
 
@@ -413,15 +427,15 @@ function useRealtimeSSE(codes: string[]) {
 
 | Phase | 任务 | 优先级 | 说明 |
 |-------|------|--------|------|
-| **3.1** | 数据库 Schema 重构 | P0 | 新增 Sector/LimitUp 等表，修改 Stock/RealtimeData |
-| **3.2** | AkshareService 重构 | P0 | 新增所有数据接口方法 |
-| **3.3** | 定时任务重构 | P0 | 股票列表 + 历史补全 + 增量轮询 |
-| **3.4** | SSE 推送服务 | P0 | RealtimePushService + SSE Controller |
-| **3.5** | MarketService 重构 | P0 | 适配新 Schema 和接口 |
-| **3.6** | 板块数据采集 | P1 | 行业/概念板块定时采集 |
-| **3.7** | 涨停板数据采集 | P1 | 涨停板数据定时采集 |
-| **3.8** | 前端 SSE 接入 | P0 | 自选股列表实时更新 |
-| **3.9** | 前端字段扩展 | P1 | 跟随后端新增字段，保留样式 |
+| **P1** | 数据库 Schema 重构 | P0 | 新增 Sector/LimitUp 等表，修改 Stock/RealtimeData |
+| **P2** | AkshareService 重构 | P0 | 新增所有数据接口方法 |
+| **P3** | 定时任务重构 | P0 | 股票列表 + 历史补全 + 增量轮询 |
+| **P4** | SSE 推送服务 | P0 | RealtimePushService + SSE Controller |
+| **P5** | MarketService 重构 | P0 | 适配新 Schema 和接口 |
+| **P6** | 板块数据采集 | P1 | 行业/概念板块定时采集 |
+| **P7** | 涨停板数据采集 | P1 | 涨停板数据定时采集 |
+| **P8** | 前端 SSE 接入 | P0 | 自选股列表实时更新 |
+| **P9** | 前端字段扩展 | P1 | 跟随后端新增字段，保留样式 |
 
 ---
 
