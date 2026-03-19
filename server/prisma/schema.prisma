@@ -303,6 +303,7 @@ model LimitUpStock {
   limitUp LimitUp @relation(fields: [limitUpId], references: [id])
 
   @@index([limitUpId])
+  @@unique([limitUpId, code])
 }
 
 // 系统设置

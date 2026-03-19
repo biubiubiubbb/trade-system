@@ -46,6 +46,16 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     return this.client.mget(...keys);
   }
 
+  async mgetBatch(keys: string[], batchSize = 50): Promise<(string | null)[]> {
+    const results: (string | null)[] = [];
+    for (let i = 0; i < keys.length; i += batchSize) {
+      const batch = keys.slice(i, i + batchSize);
+      const batchResults = await this.client.mget(...batch);
+      results.push(...batchResults);
+    }
+    return results;
+  }
+
   async incr(key: string): Promise<number> {
     return this.client.incr(key);
   }
