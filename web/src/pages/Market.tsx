@@ -6,6 +6,7 @@ import { RealtimeData } from '../services/marketApi';
 import { useRealtimeSSE } from '../hooks/useRealtimeSSE';
 import { useBidAsk } from '../hooks/useBidAsk';
 import { BidAskPanel } from '../components/market/BidAskPanel';
+import { RealtimeTicker } from '../components/market/RealtimeTicker';
 
 interface Stock {
   code: string;
@@ -25,6 +26,55 @@ function formatMarketCap(value: number): string {
   return (value / 1e4).toFixed(2) + '万';
 }
 
+// SSE Connection Status Indicator
+function SSEStatus({ connected, count }: { connected: boolean; count: number }) {
+  return (
+    <div className="flex items-center gap-1.5">
+      <div
+        className={`w-2 h-2 rounded-full transition-all duration-300 ${connected ? 'bg-green-500 shadow-lg shadow-green-500/50' : 'bg-red-400 animate-pulse'}`}
+      />
+      <span
+        style={{
+          fontFamily: 'var(--font-mono)',
+          fontSize: 10,
+          color: 'var(--color-text-secondary)',
+        }}
+      >
+        {connected ? `${count}只实时` : '离线'}
+      </span>
+    </div>
+  );
+}
+
+// Loading skeleton for stats
+function StatsSkeleton() {
+  return (
+    <div className="grid grid-cols-4 gap-4">
+      {[...Array(8)].map((_, i) => (
+        <div
+          key={i}
+          className="animate-pulse"
+          style={{
+            padding: 16,
+            backgroundColor: 'var(--color-surface)',
+            borderRadius: 4,
+            border: '1px solid var(--color-border)',
+          }}
+        >
+          <div
+            className="h-3 rounded mb-2"
+            style={{ width: '60%', backgroundColor: 'var(--color-border)' }}
+          />
+          <div
+            className="h-5 rounded"
+            style={{ width: '80%', backgroundColor: 'var(--color-border)' }}
+          />
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export function Market() {
   const [searchParams, setSearchParams] = useSearchParams();
   const selectedCode = searchParams.get('code');
@@ -42,7 +92,7 @@ export function Market() {
 
   // SSE subscription
   const stockCodes = stocks.map((s) => s.code);
-  const { data: realtimeMap } = useRealtimeSSE(stockCodes);
+  const { data: realtimeMap, connected } = useRealtimeSSE(stockCodes);
 
   // BidAsk for selected stock
   const { data: bidAsk } = useBidAsk(selectedCode);
@@ -76,6 +126,13 @@ export function Market() {
   // Financial theme: sidebar width 220, cartoon: 200, minimal: 80
   const sidebarW = isMinimal ? 'w-[80px]' : isFinancial ? 'w-[220px]' : 'w-[200px]';
 
+  // Merge SSE data with stock data for selected stock
+  const selectedRealtime = selectedCode ? realtimeMap.get(selectedCode) : null;
+  const displayStock = selectedStock ? {
+    ...selectedStock,
+    realtime: selectedRealtime || selectedStock.realtime,
+  } : null;
+
   return (
     <div className="flex h-full">
       {/* Left: Stock list */}
@@ -92,8 +149,13 @@ export function Market() {
           backdropFilter: isFinancial ? 'blur(12px)' : undefined,
         }}
       >
-        {/* Search */}
-        <div className="p-3" style={{ borderBottom: isCartoon ? '3px solid var(--color-border)' : '1px solid var(--color-border)' }}>
+        {/* Search + SSE Status */}
+        <div
+          className="p-3 space-y-2"
+          style={{ borderBottom: isCartoon ? '3px solid var(--color-border)' : '1px solid var(--color-border)' }}
+        >
+          <SSEStatus connected={connected} count={stockCodes.length} />
+
           {isCartoon ? (
             <input
               type="text" placeholder="搜索..." value={keyword} onChange={e => setKeyword(e.target.value)}
@@ -115,73 +177,20 @@ export function Market() {
           )}
         </div>
 
-        {/* List */}
+        {/* List - using RealtimeTicker */}
         <div className="flex-1 overflow-y-auto">
           {stocks.map((stock) => {
-            const active = selectedCode === stock.code;
             const realtime = realtimeMap.get(stock.code) || stock.realtime;
-            const up = realtime?.changePct != null && realtime.changePct >= 0;
             return (
-              <div
+              <RealtimeTicker
                 key={stock.code}
+                code={stock.code}
+                name={stock.name}
+                industry={stock.industry}
+                realtime={realtime}
+                selected={selectedCode === stock.code}
                 onClick={() => setSearchParams({ code: stock.code })}
-                className="cursor-pointer transition-all duration-150"
-                style={{
-                  padding: isCartoon ? '10px 12px' : isMinimal ? '16px 8px' : '12px 16px',
-                  borderBottom: isCartoon ? '2px solid rgba(255,215,0,0.15)' : (isMinimal ? '1px solid #E5E5E5' : '1px solid var(--color-border)'),
-                  backgroundColor: active
-                    ? (isCartoon ? 'rgba(255,215,0,0.2)' : (isMinimal ? 'var(--color-surface)' : 'rgba(59,130,246,0.12)'))
-                    : 'transparent',
-                  borderLeft: active && isFinancial ? '3px solid var(--color-primary)' : (active && isCartoon ? '3px solid var(--color-primary)' : 'none'),
-                }}
-              >
-                <div className="flex justify-between items-center">
-                  <span
-                    style={{
-                      fontFamily: isCartoon ? 'var(--font-heading)' : (isMinimal ? 'var(--font-heading)' : 'var(--font-body)'),
-                      fontSize: isCartoon ? 8 : (isMinimal ? 18 : 14),
-                      fontWeight: isMinimal ? 400 : 600,
-                      color: 'var(--color-text)',
-                      letterSpacing: isMinimal ? '0.1em' : undefined,
-                    }}
-                  >
-                    {isMinimal ? stock.code : stock.name}
-                  </span>
-                  {isCartoon ? (
-                    <span className="price-tag" style={{ color: up ? 'var(--color-up)' : 'var(--color-down)', borderColor: 'var(--color-border)' }}>
-                      {up ? '+' : ''}{fmt(realtime?.changePct)}%
-                    </span>
-                  ) : isMinimal ? (
-                    <span className="mono" style={{ fontSize: 12, color: up ? 'var(--color-up)' : 'var(--color-down)', fontWeight: 500 }}>
-                      {up ? '+' : ''}{fmt(realtime?.changePct)}%
-                    </span>
-                  ) : (
-                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: up ? 'var(--color-up)' : 'var(--color-down)', fontWeight: 600 }}>
-                      {up ? '+' : ''}{fmt(realtime?.price)}
-                    </span>
-                  )}
-                </div>
-                {!isMinimal && (
-                  <div className="flex justify-between items-center mt-1">
-                    {isCartoon ? (
-                      <span style={{ fontFamily: 'var(--font-mono)', fontSize: 6, color: 'var(--color-primary)' }}>
-                        {stock.code}
-                      </span>
-                    ) : (
-                      <>
-                        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--color-text-secondary)' }}>
-                          {stock.code}
-                        </span>
-                        <span
-                          style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: up ? 'var(--color-up)' : 'var(--color-down)', padding: '1px 6px', borderRadius: 2, background: up ? 'rgba(239,68,68,0.12)' : 'rgba(16,185,129,0.12)' }}
-                        >
-                          {up ? '+' : ''}{fmt(realtime?.changePct)}%
-                        </span>
-                      </>
-                    )}
-                  </div>
-                )}
-              </div>
+              />
             );
           })}
         </div>
@@ -189,25 +198,25 @@ export function Market() {
 
       {/* Right: Detail */}
       <div className="flex-1 overflow-y-auto" style={{ backgroundColor: 'var(--color-background)' }}>
-        {selectedStock ? (
+        {displayStock ? (
           <div className="p-6">
             {/* Header */}
             <div className="mb-6">
               {isMinimal ? (
                 <div>
-                  <div className="page-title">{selectedStock.code}</div>
+                  <div className="page-title">{displayStock.code}</div>
                   <div style={{ fontFamily: 'var(--font-heading)', fontSize: 48, letterSpacing: '0.05em', color: 'var(--color-text)', lineHeight: 1 }}>
-                    {selectedStock.name}
+                    {displayStock.name}
                   </div>
                 </div>
               ) : (
                 <div>
                   <div className="flex items-baseline gap-3">
                     <h1 className={isFinancial ? 'page-title mb-0' : (isCartoon ? 'page-title mb-2' : 'page-title mb-0')}>
-                      {selectedStock.name}
+                      {displayStock.name}
                     </h1>
                     <span style={{ fontFamily: 'var(--font-mono)', fontSize: isCartoon ? 8 : 13, color: 'var(--color-text-secondary)' }}>
-                      {selectedStock.code} · {selectedStock.market === 'SH' ? '上证' : '深证'}
+                      {displayStock.code} · {displayStock.market === 'SH' ? '上证' : '深证'}
                     </span>
                   </div>
                   {/* Price hero */}
@@ -217,20 +226,20 @@ export function Market() {
                         fontFamily: isCartoon ? 'var(--font-mono)' : 'var(--font-mono)',
                         fontSize: isCartoon ? 12 : 36,
                         fontWeight: 700,
-                        color: isUp(selectedStock) ? 'var(--color-up)' : 'var(--color-down)',
+                        color: isUp(displayStock) ? 'var(--color-up)' : 'var(--color-down)',
                       }}
                     >
-                      {fmt(selectedStock.realtime?.price)}
+                      {fmt(displayStock.realtime?.price)}
                     </span>
                     <span
                       style={{
                         fontFamily: 'var(--font-mono)',
                         fontSize: isCartoon ? 8 : 16,
-                        color: isUp(selectedStock) ? 'var(--color-up)' : 'var(--color-down)',
+                        color: isUp(displayStock) ? 'var(--color-up)' : 'var(--color-down)',
                         marginBottom: isCartoon ? 2 : 4,
                       }}
                     >
-                      {isUp(selectedStock) ? '▲' : '▼'} {isUp(selectedStock) ? '+' : ''}{fmt(selectedStock.realtime?.change)} ({isUp(selectedStock) ? '+' : ''}{fmt(selectedStock.realtime?.changePct)}%)
+                      {isUp(displayStock) ? '▲' : '▼'} {isUp(displayStock) ? '+' : ''}{fmt(displayStock.realtime?.change)} ({isUp(displayStock) ? '+' : ''}{fmt(displayStock.realtime?.changePct)}%)
                     </span>
                   </div>
                 </div>
@@ -240,9 +249,7 @@ export function Market() {
             {/* Chart */}
             <div className={`${cardClass} p-4 mb-6`} style={isCartoon ? { boxShadow: '4px 4px 0px var(--color-border)' } : (isFinancial ? { backdropFilter: 'blur(12px)' } : { borderTop: '4px solid var(--color-border)' })}>
               {loading ? (
-                <div className="flex items-center justify-center" style={{ height: isMinimal ? 300 : 450, color: 'var(--color-text-secondary)' }}>
-                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}>加载中...</span>
-                </div>
+                <StatsSkeleton />
               ) : (
                 <KLineChart data={historyData} height={isMinimal ? 300 : 450} />
               )}
@@ -251,14 +258,14 @@ export function Market() {
             {/* Stats grid */}
             <div className={`${isMinimal ? 'swiss-grid' : 'grid grid-cols-4 gap-4'}`}>
               {[
-                { label: '开盘', value: fmt(selectedStock.realtime?.open) },
-                { label: '昨收', value: fmt(selectedStock.realtime?.prevClose) },
-                { label: '最高', value: fmt(selectedStock.realtime?.high), up: true },
-                { label: '最低', value: fmt(selectedStock.realtime?.low), down: true },
-                { label: '成交量', value: (selectedStock.realtime?.volume ? (selectedStock.realtime.volume / 100000000).toFixed(2) + '亿' : '--') },
-                { label: '成交额', value: (selectedStock.realtime?.amount ? (selectedStock.realtime.amount / 100000000).toFixed(2) + '亿' : '--') },
-                { label: '涨跌额', value: `${isUp(selectedStock) ? '+' : ''}${fmt(selectedStock.realtime?.change)}`, up: isUp(selectedStock), down: !isUp(selectedStock) },
-                { label: '涨跌幅', value: `${isUp(selectedStock) ? '+' : ''}${fmt(selectedStock.realtime?.changePct)}%`, up: isUp(selectedStock), down: !isUp(selectedStock) },
+                { label: '开盘', value: fmt(displayStock.realtime?.open) },
+                { label: '昨收', value: fmt(displayStock.realtime?.prevClose) },
+                { label: '最高', value: fmt(displayStock.realtime?.high), up: true },
+                { label: '最低', value: fmt(displayStock.realtime?.low), down: true },
+                { label: '成交量', value: (displayStock.realtime?.volume ? (displayStock.realtime.volume / 100000000).toFixed(2) + '亿' : '--') },
+                { label: '成交额', value: (displayStock.realtime?.amount ? (displayStock.realtime.amount / 100000000).toFixed(2) + '亿' : '--') },
+                { label: '涨跌额', value: `${isUp(displayStock) ? '+' : ''}${fmt(displayStock.realtime?.change)}`, up: isUp(displayStock), down: !isUp(displayStock) },
+                { label: '涨跌幅', value: `${isUp(displayStock) ? '+' : ''}${fmt(displayStock.realtime?.changePct)}%`, up: isUp(displayStock), down: !isUp(displayStock) },
               ].map((item) => (
                 <div
                   key={item.label}
@@ -285,12 +292,12 @@ export function Market() {
             {/* Extended fields */}
             <div className={`${isMinimal ? 'swiss-grid mt-4' : 'grid grid-cols-4 gap-4 mt-4'}`}>
               {[
-                { label: '换手率', value: selectedStock.realtime?.turnoverRate ? `${selectedStock.realtime.turnoverRate.toFixed(2)}%` : '--' },
-                { label: '市盈率', value: selectedStock.realtime?.pe ? selectedStock.realtime.pe.toFixed(2) : '--' },
-                { label: '市净率', value: selectedStock.realtime?.pb ? selectedStock.realtime.pb.toFixed(2) : '--' },
-                { label: '总市值', value: selectedStock.realtime?.marketCap ? formatMarketCap(selectedStock.realtime.marketCap) : '--' },
-                { label: '流通市值', value: selectedStock.realtime?.floatMarketCap ? formatMarketCap(selectedStock.realtime.floatMarketCap) : '--' },
-                { label: '振幅', value: selectedStock.realtime?.amplitude ? `${selectedStock.realtime.amplitude.toFixed(2)}%` : '--' },
+                { label: '换手率', value: displayStock.realtime?.turnoverRate ? `${displayStock.realtime.turnoverRate.toFixed(2)}%` : '--' },
+                { label: '市盈率', value: displayStock.realtime?.pe ? displayStock.realtime.pe.toFixed(2) : '--' },
+                { label: '市净率', value: displayStock.realtime?.pb ? displayStock.realtime.pb.toFixed(2) : '--' },
+                { label: '总市值', value: displayStock.realtime?.marketCap ? formatMarketCap(displayStock.realtime.marketCap) : '--' },
+                { label: '流通市值', value: displayStock.realtime?.floatMarketCap ? formatMarketCap(displayStock.realtime.floatMarketCap) : '--' },
+                { label: '振幅', value: displayStock.realtime?.amplitude ? `${displayStock.realtime.amplitude.toFixed(2)}%` : '--' },
               ].map((item) => (
                 <div
                   key={item.label}
