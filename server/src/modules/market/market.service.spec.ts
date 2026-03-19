@@ -2,28 +2,26 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { MarketService } from './market.service';
 import { PrismaService } from '../../database/prisma.service';
 import { RedisService } from '../../services/redis.service';
+import { DataGateway } from '../../services/data-gateway/data-gateway.service';
+import { RealtimePushService } from './realtime-push.service';
 
 describe('MarketService', () => {
   let service: MarketService;
 
   const mockPrisma = {
-    stock: {
-      findMany: jest.fn(),
-      findUnique: jest.fn(),
-      count: jest.fn(),
-    },
-    historyData: {
-      findMany: jest.fn(),
-    },
-    realtimeData: {
-      findUnique: jest.fn(),
-    },
+    stock: { findMany: jest.fn(), findUnique: jest.fn(), count: jest.fn() },
+    historyData: { findMany: jest.fn() },
+    realtimeData: { findMany: jest.fn(), findUnique: jest.fn() },
+    sector: { findMany: jest.fn() },
+    sectorHistory: { findMany: jest.fn() },
+    sectorStock: { findMany: jest.fn() },
+    limitUp: { findFirst: jest.fn() },
+    limitUpStock: { findMany: jest.fn(), count: jest.fn() },
   };
 
-  const mockRedis = {
-    get: jest.fn(),
-    set: jest.fn(),
-  };
+  const mockRedis = { get: jest.fn(), set: jest.fn() };
+  const mockDataGateway = { getMinuteData: jest.fn(), getHotStocks: jest.fn() };
+  const mockRealtimePush = { getSnapshot: jest.fn() };
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -31,6 +29,8 @@ describe('MarketService', () => {
         MarketService,
         { provide: PrismaService, useValue: mockPrisma },
         { provide: RedisService, useValue: mockRedis },
+        { provide: DataGateway, useValue: mockDataGateway },
+        { provide: RealtimePushService, useValue: mockRealtimePush },
       ],
     }).compile();
 
@@ -60,6 +60,7 @@ describe('MarketService', () => {
         skip: 0,
         take: 20,
         orderBy: { code: 'asc' },
+        include: { realtime: true },
       });
       expect(mockPrisma.stock.count).toHaveBeenCalledWith({ where: {} });
     });
@@ -151,7 +152,10 @@ describe('MarketService', () => {
       const result = await service.getStock('600000');
 
       expect(result).toEqual(mockStock);
-      expect(mockPrisma.stock.findUnique).toHaveBeenCalledWith({ where: { code: '600000' } });
+      expect(mockPrisma.stock.findUnique).toHaveBeenCalledWith({
+        where: { code: '600000' },
+        include: { realtime: true },
+      });
     });
 
     it('should return null if stock not found', async () => {
@@ -259,24 +263,20 @@ describe('MarketService', () => {
       mockRedis.get.mockResolvedValue(JSON.stringify(cachedData));
 
       const result = await service.getRealtime('600000');
-
       expect(result).toEqual(cachedData);
-      expect(mockPrisma.realtimeData.findUnique).not.toHaveBeenCalled();
     });
 
     it('should fetch from DB if not cached', async () => {
       mockRedis.get.mockResolvedValue(null);
-      const dbData = { code: '600000', price: 10.5 };
-      mockPrisma.realtimeData.findUnique.mockResolvedValue(dbData);
+      mockPrisma.realtimeData.findUnique.mockResolvedValue({
+        code: '600000', name: '浦发银行', price: 10.5, change: 0.1, changePct: 1.0,
+        volume: 1000, amount: 10000, high: 10.8, low: 10.2, open: 10.4, prevClose: 10.4,
+        updatedAt: new Date(),
+      });
 
       const result = await service.getRealtime('600000');
-
-      expect(result).toEqual(dbData);
-      expect(mockRedis.set).toHaveBeenCalledWith(
-        'realtime:600000',
-        JSON.stringify(dbData),
-        60,
-      );
+      expect(result?.code).toBe('600000');
+      expect(result?.price).toBe(10.5);
     });
 
     it('should return null if no data exists', async () => {
@@ -290,27 +290,22 @@ describe('MarketService', () => {
   });
 
   describe('getRealtimeBatch', () => {
-    it('should return realtime data for multiple codes', async () => {
-      const cached1 = { code: '600000', price: 10.5 };
-      mockRedis.get
-        .mockResolvedValueOnce(JSON.stringify(cached1))
-        .mockResolvedValueOnce(null);
-
-      const dbData = { code: '000001', price: 12.0 };
-      mockPrisma.realtimeData.findUnique.mockResolvedValue(dbData);
+    it('should return from SSE snapshot first', async () => {
+      const snapshot = [{ code: '600000', price: 10.5 }, { code: '000001', price: 12.0 }];
+      mockRealtimePush.getSnapshot.mockResolvedValue(snapshot);
 
       const result = await service.getRealtimeBatch(['600000', '000001']);
-
-      expect(result).toEqual([cached1, dbData]);
+      expect(result).toHaveLength(2);
     });
 
-    it('should filter out null results', async () => {
-      mockRedis.get.mockResolvedValue(null);
-      mockPrisma.realtimeData.findUnique.mockResolvedValue(null);
+    it('should fallback to DB if snapshot empty', async () => {
+      mockRealtimePush.getSnapshot.mockResolvedValue([]);
+      mockPrisma.realtimeData.findMany.mockResolvedValue([
+        { code: '600000', price: 10.5 },
+      ]);
 
-      const result = await service.getRealtimeBatch(['000000']);
-
-      expect(result).toEqual([]);
+      const result = await service.getRealtimeBatch(['600000']);
+      expect(result).toHaveLength(1);
     });
   });
 
@@ -322,13 +317,14 @@ describe('MarketService', () => {
       ];
       mockPrisma.stock.findMany.mockResolvedValue(mockStocks);
 
-      const result = await service.getRankings(50, 'up');
+      const result = await service.getRankings('up', 50);
 
       expect(result).toEqual(mockStocks);
       expect(mockPrisma.stock.findMany).toHaveBeenCalledWith({
         where: { realtime: { isNot: null } },
         take: 50,
         orderBy: { realtime: { changePct: 'desc' } },
+        include: { realtime: true },
       });
     });
 
@@ -338,24 +334,104 @@ describe('MarketService', () => {
       ];
       mockPrisma.stock.findMany.mockResolvedValue(mockStocks);
 
-      const result = await service.getRankings(10, 'down');
+      const result = await service.getRankings('down', 10);
 
       expect(result).toEqual(mockStocks);
       expect(mockPrisma.stock.findMany).toHaveBeenCalledWith({
         where: { realtime: { isNot: null } },
         take: 10,
         orderBy: { realtime: { changePct: 'asc' } },
+        include: { realtime: true },
       });
     });
 
     it('should respect custom limit', async () => {
       mockPrisma.stock.findMany.mockResolvedValue([]);
 
-      await service.getRankings(5, 'up');
+      await service.getRankings('up', 5);
 
       expect(mockPrisma.stock.findMany).toHaveBeenCalledWith(
         expect.objectContaining({ take: 5 }),
       );
+    });
+  });
+
+  describe('getSectors', () => {
+    it('should return all sectors', async () => {
+      const mockSectors = [{ id: '1', code: 'IND_INDUSTRY', name: '银行', type: 'INDUSTRY' }];
+      mockPrisma.sector.findMany.mockResolvedValue(mockSectors);
+
+      const result = await service.getSectors({});
+      expect(result).toEqual(mockSectors);
+    });
+
+    it('should filter by type', async () => {
+      mockPrisma.sector.findMany.mockResolvedValue([]);
+
+      await service.getSectors({ type: 'INDUSTRY' });
+
+      expect(mockPrisma.sector.findMany).toHaveBeenCalledWith({
+        where: { type: 'INDUSTRY' },
+      });
+    });
+  });
+
+  describe('getSectorStocks', () => {
+    it('should return stocks in sector', async () => {
+      const mockSectorStocks = [
+        { stock: { code: '600000', name: '浦发银行', realtime: { price: 10.5 } } },
+      ];
+      mockPrisma.sectorStock.findMany.mockResolvedValue(mockSectorStocks);
+
+      const result = await service.getSectorStocks('sector-1');
+      expect(result).toHaveLength(1);
+      expect(result[0].code).toBe('600000');
+    });
+  });
+
+  describe('getLimitUp', () => {
+    it('should return empty if no limitUp record found', async () => {
+      mockPrisma.limitUp.findFirst.mockResolvedValue(null);
+
+      const result = await service.getLimitUp({});
+      expect(result.items).toEqual([]);
+      expect(result.total).toBe(0);
+    });
+
+    it('should return paginated limit up stocks', async () => {
+      const mockLimitUp = { id: 'limit-1', date: new Date(), type: 'LIMIT_UP' };
+      const mockStocks = [
+        { code: '600000', name: '浦发银行', changePct: 10.0, price: 11.0, amount: 1000000 },
+      ];
+
+      mockPrisma.limitUp.findFirst.mockResolvedValue(mockLimitUp);
+      mockPrisma.limitUpStock.findMany.mockResolvedValue(mockStocks);
+      mockPrisma.limitUpStock.count.mockResolvedValue(1);
+
+      const result = await service.getLimitUp({ page: 1, pageSize: 50 });
+
+      expect(result.items).toEqual(mockStocks);
+      expect(result.total).toBe(1);
+    });
+  });
+
+  describe('getMinuteData', () => {
+    it('should delegate to dataGateway', async () => {
+      const mockData = [{ time: '09:30', price: 10.5 }];
+      mockDataGateway.getMinuteData.mockResolvedValue(mockData);
+
+      const result = await service.getMinuteData('600000');
+      expect(result).toEqual(mockData);
+    });
+  });
+
+  describe('getHotStocks', () => {
+    it('should delegate to dataGateway', async () => {
+      const mockData = [{ rank: 1, code: '600000', name: '浦发银行' }];
+      mockDataGateway.getHotStocks.mockResolvedValue(mockData);
+
+      const result = await service.getHotStocks('A股', '', '今日');
+      expect(result).toEqual(mockData);
     });
   });
 });

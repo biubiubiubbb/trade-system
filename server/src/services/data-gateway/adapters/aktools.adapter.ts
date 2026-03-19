@@ -150,7 +150,7 @@ export class AktoolsAdapter {
     return this.dfToObjects<any>(df).map((r) => ({
       code: r['代码'] || '',
       name: r['名称'] || '',
-      changePxt: parseFloat(r['涨跌幅']) || 0,
+      changePct: parseFloat(r['涨跌幅']) || 0,
       price: parseFloat(r['最新价']) || 0,
       amount: parseFloat(r['成交额']) || 0,
       floatMarketCap: parseFloat(r['流通市值']) || 0,

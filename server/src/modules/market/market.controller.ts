@@ -3,6 +3,8 @@ import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { MarketService } from './market.service';
 import { StockListQueryDto } from './dto/stock.dto';
 import { HistoryQueryDto } from './dto/history-query.dto';
+import { SectorQueryDto } from './dto/sector.dto';
+import { LimitUpQueryDto } from './dto/limit-up.dto';
 
 @ApiTags('行情')
 @Controller('market')
@@ -57,7 +59,53 @@ export class MarketController {
     @Query('limit') limit: number = 50,
     @Query('type') type: 'up' | 'down' = 'up',
   ) {
-    const data = await this.marketService.getRankings(limit, type);
+    const data = await this.marketService.getRankings(type, limit);
+    return { code: 0, message: 'success', data };
+  }
+
+  @Get('minute/:code')
+  @ApiOperation({ summary: '获取分钟级数据（按需，不存储）' })
+  async getMinuteData(@Param('code') code: string) {
+    const data = await this.marketService.getMinuteData(code);
+    return { code: 0, message: 'success', data };
+  }
+
+  @Get('sectors')
+  @ApiOperation({ summary: '获取板块列表' })
+  async getSectors(@Query() query: SectorQueryDto) {
+    const data = await this.marketService.getSectors(query);
+    return { code: 0, message: 'success', data };
+  }
+
+  @Get('sectors/:id/stocks')
+  @ApiOperation({ summary: '获取板块成分股' })
+  async getSectorStocks(@Param('id') id: string) {
+    const data = await this.marketService.getSectorStocks(id);
+    return { code: 0, message: 'success', data };
+  }
+
+  @Get('sectors/:id/history')
+  @ApiOperation({ summary: '获取板块指数历史' })
+  async getSectorHistory(
+    @Param('id') id: string,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+  ) {
+    const data = await this.marketService.getSectorHistory(id, startDate, endDate);
+    return { code: 0, message: 'success', data };
+  }
+
+  @Get('limitup')
+  @ApiOperation({ summary: '获取涨停板数据' })
+  async getLimitUp(@Query() query: LimitUpQueryDto) {
+    const result = await this.marketService.getLimitUp(query);
+    return { code: 0, message: 'success', data: result };
+  }
+
+  @Get('hot')
+  @ApiOperation({ summary: '获取热搜股票' })
+  async getHotStocks(@Query('symbol') symbol?: string) {
+    const data = await this.marketService.getHotStocks(symbol || 'A股', '', '今日');
     return { code: 0, message: 'success', data };
   }
 }

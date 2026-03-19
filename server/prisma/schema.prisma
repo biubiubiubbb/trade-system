@@ -17,6 +17,7 @@ model Stock {
 
   history   HistoryData[]
   realtime  RealtimeData?
+  sectorStocks SectorStock[]
 }
 
 // 历史行情数据
@@ -42,6 +43,7 @@ model HistoryData {
 // 实时行情数据
 model RealtimeData {
   code        String   @id
+  name        String?
   price       Float
   change      Float
   changePct   Float
@@ -51,8 +53,13 @@ model RealtimeData {
   low         Float
   open        Float
   prevClose   Float
-  bid1        Float
-  ask1        Float
+  amplitude   Float?
+  turnoverRate Float?
+  pe          Float?
+  pb          Float?
+  marketCap   Float?
+  floatMarketCap Float?
+  bidAsk      Json?
   updatedAt   DateTime @updatedAt
 
   stock       Stock    @relation(fields: [code], references: [code])
@@ -218,6 +225,84 @@ model WatchlistStock {
   watchlist  Watchlist @relation(fields: [watchlistId], references: [id], onDelete: Cascade)
 
   @@id([watchlistId, stockCode])
+}
+
+// 板块信息
+model Sector {
+  id   String @id @default(uuid())
+  code String @unique
+  name String
+  type String // INDUSTRY | CONCEPT
+
+  stocks  SectorStock[]
+  history SectorHistory[]
+}
+
+// 板块历史
+model SectorHistory {
+  id       String   @id @default(uuid())
+  sectorId String
+  date     DateTime
+  open     Float
+  high     Float
+  low      Float
+  close    Float
+  change   Float
+  changePct Float
+  volume   Float
+  amount   Float
+
+  sector Sector @relation(fields: [sectorId], references: [id])
+
+  @@unique([sectorId, date])
+  @@index([sectorId, date])
+}
+
+// 板块成分股
+model SectorStock {
+  sectorId String
+  stockCode String
+
+  sector Sector @relation(fields: [sectorId], references: [id])
+  stock  Stock  @relation(fields: [stockCode], references: [code])
+
+  @@id([sectorId, stockCode])
+}
+
+// 涨停板记录（按日期）
+model LimitUp {
+  id   String   @id @default(uuid())
+  date DateTime @db.Date
+  type String   // LIMIT_UP | LIMIT_DOWN | PREV_LIMIT_UP | STRONG | BROKEN
+
+  stocks LimitUpStock[]
+
+  @@unique([date, type])
+  @@index([date])
+}
+
+// 涨停股票明细
+model LimitUpStock {
+  id            String @id @default(uuid())
+  limitUpId     String
+  code          String
+  name          String
+  changePct     Float
+  price         Float
+  amount        Float
+  floatMarketCap Float?
+  totalMarketCap Float?
+  turnoverRate  Float?
+  sealAmount    Float?
+  firstSealTime String?
+  lastSealTime  String?
+  brokenCount   Int?
+  continueBoard Int?
+  industry      String?
+
+  limitUp LimitUp @relation(fields: [limitUpId], references: [id])
+
+  @@index([limitUpId])
 }
 
 // 系统设置
