@@ -2,21 +2,27 @@ import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { KLineChart } from '../components/charts/KLineChart';
 import { useTheme } from '../theme/ThemeContext';
+import { RealtimeData } from '../services/marketApi';
+import { useRealtimeSSE } from '../hooks/useRealtimeSSE';
+import { useBidAsk } from '../hooks/useBidAsk';
+import { BidAskPanel } from '../components/market/BidAskPanel';
 
 interface Stock {
   code: string;
   name: string;
   market: string;
   industry?: string;
-  realtime?: {
-    price: number; change: number; changePct: number;
-    high: number; low: number; open: number;
-    prevClose: number; volume: number; amount: number;
-  };
+  realtime?: RealtimeData;
 }
 interface HistoryData {
   date: string; open: number; close: number;
   high: number; low: number; volume: number;
+}
+
+function formatMarketCap(value: number): string {
+  if (value >= 1e12) return (value / 1e12).toFixed(2) + '万亿';
+  if (value >= 1e8) return (value / 1e8).toFixed(2) + '亿';
+  return (value / 1e4).toFixed(2) + '万';
 }
 
 export function Market() {
@@ -33,6 +39,13 @@ export function Market() {
   const isFinancial = theme === 'financial';
   const isCartoon = theme === 'cartoon';
   const isMinimal = theme === 'minimal';
+
+  // SSE subscription
+  const stockCodes = stocks.map((s) => s.code);
+  const { data: realtimeMap } = useRealtimeSSE(stockCodes);
+
+  // BidAsk for selected stock
+  const { data: bidAsk } = useBidAsk(selectedCode);
 
   useEffect(() => {
     const params = new URLSearchParams();
@@ -106,7 +119,8 @@ export function Market() {
         <div className="flex-1 overflow-y-auto">
           {stocks.map((stock) => {
             const active = selectedCode === stock.code;
-            const up = isUp(stock);
+            const realtime = realtimeMap.get(stock.code) || stock.realtime;
+            const up = realtime?.changePct != null && realtime.changePct >= 0;
             return (
               <div
                 key={stock.code}
@@ -135,15 +149,15 @@ export function Market() {
                   </span>
                   {isCartoon ? (
                     <span className="price-tag" style={{ color: up ? 'var(--color-up)' : 'var(--color-down)', borderColor: 'var(--color-border)' }}>
-                      {up ? '+' : ''}{fmt(stock.realtime?.changePct)}%
+                      {up ? '+' : ''}{fmt(realtime?.changePct)}%
                     </span>
                   ) : isMinimal ? (
                     <span className="mono" style={{ fontSize: 12, color: up ? 'var(--color-up)' : 'var(--color-down)', fontWeight: 500 }}>
-                      {up ? '+' : ''}{fmt(stock.realtime?.changePct)}%
+                      {up ? '+' : ''}{fmt(realtime?.changePct)}%
                     </span>
                   ) : (
                     <span style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: up ? 'var(--color-up)' : 'var(--color-down)', fontWeight: 600 }}>
-                      {up ? '+' : ''}{fmt(stock.realtime?.price)}
+                      {up ? '+' : ''}{fmt(realtime?.price)}
                     </span>
                   )}
                 </div>
@@ -161,7 +175,7 @@ export function Market() {
                         <span
                           style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: up ? 'var(--color-up)' : 'var(--color-down)', padding: '1px 6px', borderRadius: 2, background: up ? 'rgba(239,68,68,0.12)' : 'rgba(16,185,129,0.12)' }}
                         >
-                          {up ? '+' : ''}{fmt(stock.realtime?.changePct)}%
+                          {up ? '+' : ''}{fmt(realtime?.changePct)}%
                         </span>
                       </>
                     )}
@@ -266,6 +280,43 @@ export function Market() {
                   </div>
                 </div>
               ))}
+            </div>
+
+            {/* Extended fields */}
+            <div className={`${isMinimal ? 'swiss-grid mt-4' : 'grid grid-cols-4 gap-4 mt-4'}`}>
+              {[
+                { label: '换手率', value: selectedStock.realtime?.turnoverRate ? `${selectedStock.realtime.turnoverRate.toFixed(2)}%` : '--' },
+                { label: '市盈率', value: selectedStock.realtime?.pe ? selectedStock.realtime.pe.toFixed(2) : '--' },
+                { label: '市净率', value: selectedStock.realtime?.pb ? selectedStock.realtime.pb.toFixed(2) : '--' },
+                { label: '总市值', value: selectedStock.realtime?.marketCap ? formatMarketCap(selectedStock.realtime.marketCap) : '--' },
+                { label: '流通市值', value: selectedStock.realtime?.floatMarketCap ? formatMarketCap(selectedStock.realtime.floatMarketCap) : '--' },
+                { label: '振幅', value: selectedStock.realtime?.amplitude ? `${selectedStock.realtime.amplitude.toFixed(2)}%` : '--' },
+              ].map((item) => (
+                <div
+                  key={item.label}
+                  className={isCartoon ? 'pixel-card p-3' : ''}
+                  style={isCartoon ? { boxShadow: '2px 2px 0px var(--color-border)' } : (isMinimal ? { padding: '16px' } : { padding: '16px', backgroundColor: 'var(--color-surface)', borderRadius: 4, border: '1px solid var(--color-border)' })}
+                >
+                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: isCartoon ? 6 : (isMinimal ? 10 : 11), color: 'var(--color-text-secondary)', marginBottom: 4 }}>
+                    {item.label}
+                  </div>
+                  <div
+                    style={{
+                      fontFamily: 'var(--font-mono)',
+                      fontSize: isCartoon ? 8 : (isMinimal ? 14 : 16),
+                      fontWeight: isCartoon ? 400 : 600,
+                      color: 'var(--color-text)',
+                    }}
+                  >
+                    {item.value}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* BidAsk Panel */}
+            <div className="mt-4">
+              <BidAskPanel bidAsk={bidAsk} />
             </div>
           </div>
         ) : (
