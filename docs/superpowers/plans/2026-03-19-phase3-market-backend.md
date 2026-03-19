@@ -1505,8 +1505,8 @@ export class MarketService {
   }
 
   // === 分钟级数据（按需查询，不存储）===
-  async getMinuteData(code: string, period: string, date?: string) {
-    return this.dataGateway.getMinuteData({ code, period: period as any, date });
+  async getMinuteData(code: string) {
+    return this.dataGateway.getMinuteData(code);
   }
 
   // === 板块 ===
@@ -1613,10 +1613,8 @@ import { LimitUpQueryDto } from './dto/limit-up.dto';
 @ApiOperation({ summary: '获取分钟级数据（按需，不存储）' })
 async getMinuteData(
   @Param('code') code: string,
-  @Query('period') period: string = '5',
-  @Query('date') date?: string,
 ) {
-  const data = await this.marketService.getMinuteData(code, period, date);
+  const data = await this.marketService.getMinuteData(code);
   return { code: 0, message: 'success', data };
 }
 
