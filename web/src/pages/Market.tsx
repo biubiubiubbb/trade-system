@@ -96,6 +96,10 @@ export function Market() {
   const [sectorType, setSectorType] = useState<'industry' | 'concept'>('industry');
   const [limitUpType, setLimitUpType] = useState<'up' | 'previous' | 'subnew' | 'broken' | 'down'>('up');
   const [selectedBoard, setSelectedBoard] = useState<{ name: string; type: 'concept' | 'industry' } | null>(null);
+  // 直接选择的股票代码（不通过URL，用于板块/涨停板点击）
+  const [directSelectedCode, setDirectSelectedCode] = useState<string | null>(null);
+  // 直接选择的股票完整数据
+  const [directSelectedStock, setDirectSelectedStock] = useState<Stock | null>(null);
 
   // LimitUp type labels
   const limitUpTypeLabels = {
@@ -114,8 +118,11 @@ export function Market() {
   const stockCodes = stocks.map((s) => s.code);
   const { data: realtimeMap, connected } = useRealtimeSSE(stockCodes);
 
+  // Effective code: direct selection takes priority over URL param
+  const effectiveCode = directSelectedCode || selectedCode;
+
   // BidAsk for selected stock
-  const { data: bidAsk } = useBidAsk(selectedCode);
+  const { data: bidAsk } = useBidAsk(effectiveCode);
 
   useEffect(() => {
     const params = new URLSearchParams();
@@ -127,16 +134,22 @@ export function Market() {
   }, [keyword]);
 
   useEffect(() => {
-    if (!selectedCode) return;
+    // 优先使用直接选择的股票代码，否则使用URL参数
+    const code = directSelectedCode || selectedCode;
+    if (!code) return;
     setLoading(true);
     Promise.all([
-      fetch(`/api/v1/market/stocks/${selectedCode}`).then(r => r.json()),
-      fetch(`/api/v1/market/history/${selectedCode}`).then(r => r.json()),
+      fetch(`/api/v1/market/stocks/${code}`).then(r => r.json()),
+      fetch(`/api/v1/market/history/${code}`).then(r => r.json()),
     ]).then(([stockJson, historyJson]) => {
-      setSelectedStock(stockJson.data);
+      if (directSelectedCode) {
+        setDirectSelectedStock(stockJson.data);
+      } else {
+        setSelectedStock(stockJson.data);
+      }
       setHistoryData(historyJson.data || []);
     }).finally(() => setLoading(false));
-  }, [selectedCode]);
+  }, [selectedCode, directSelectedCode]);
 
   const fmt = (n: number | undefined, d = 2) => n != null ? n.toFixed(d) : '--';
   const isUp = (s: Stock | null) => s?.realtime?.changePct != null && s.realtime.changePct >= 0;
@@ -147,10 +160,11 @@ export function Market() {
   const sidebarW = isMinimal ? 'w-[80px]' : isFinancial ? 'w-[220px]' : 'w-[200px]';
 
   // Merge SSE data with stock data for selected stock
-  const selectedRealtime = selectedCode ? realtimeMap.get(selectedCode) : null;
-  const displayStock = selectedStock ? {
-    ...selectedStock,
-    realtime: selectedRealtime || selectedStock.realtime,
+  const selectedRealtime = effectiveCode ? realtimeMap.get(effectiveCode) : null;
+  const baseStock = directSelectedStock || selectedStock;
+  const displayStock = baseStock ? {
+    ...baseStock,
+    realtime: selectedRealtime || baseStock.realtime,
   } : null;
 
   return (
@@ -331,8 +345,7 @@ export function Market() {
               <LimitUpList
                 type={limitUpType}
                 onStockClick={(code) => {
-                  setSearchParams({ code });
-                  setActiveTab('market');
+                  setDirectSelectedCode(code);
                 }}
               />
             </div>
