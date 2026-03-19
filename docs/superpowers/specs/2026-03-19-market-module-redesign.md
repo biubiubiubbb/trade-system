@@ -2,7 +2,7 @@
 
 > **创建时间：** 2026-03-19
 > **状态：** 已评审
-> **版本：** v1.1
+> **版本：** v1.2
 
 ## 1. 背景与目标
 
@@ -61,7 +61,98 @@
 
 ---
 
-## 3. 数据库 Schema 设计
+## 3. 数据源网关架构
+
+### 3.1 架构概述
+
+所有外部数据请求统一通过 **DataGateway**（数据源网关）接入，作为系统的唯一数据入口。网关内部按数据类型路由到对应的数据源 Adapter，支持主备数据源自动降级，屏蔽底层实现细节，对外输出系统标准数据结构。
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                     DataGateway (统一网关)                    │
+│  ┌─────────────────────────────────────────────────────┐   │
+│  │                   路由层 (Router)                     │   │
+│  │    按数据类型分发到对应的 Adapter，支持降级切换           │   │
+│  └─────────────────────────────────────────────────────┘   │
+│         ↓              ↓              ↓              ↓     │
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐ │
+│  │EastMoney │  │ EastMoney │  │  THS     │  │  Baidu   │ │
+│  │ Adapter  │  │ Futures   │  │ Adapter  │  │ Adapter  │ │
+│  └──────────┘  └──────────┘  └──────────┘  └──────────┘ │
+└─────────────────────────────────────────────────────────────┘
+                              ↓
+              统一标准数据结构（SystemStock / SystemRealtime / ...）
+```
+
+### 3.2 数据源路由策略
+
+| 数据类型 | 主数据源 | 备数据源 | Adapter |
+|----------|---------|---------|---------|
+| 实时行情（批量） | 东财 | 新浪 | EastMoneyAdapter → SinaAdapter |
+| 买卖盘口 | 东财 | — | EastMoneyAdapter |
+| 历史K线 | 东财 | 腾讯 | EastMoneyAdapter → TencentAdapter |
+| 分钟级数据 | 东财 | 新浪 | EastMoneyAdapter → SinaAdapter |
+| 行业板块 | 同花顺 | — | THSAdapter |
+| 概念板块 | 同花顺 | — | THSAdapter |
+| 涨停板 | 东财 | — | EastMoneyAdapter |
+| 热搜 | 百度 | — | BaiduAdapter |
+
+### 3.3 Adapter 设计
+
+每个 Adapter 负责：
+1. **请求构建** — 将统一请求参数转为对应数据源的 API 格式
+2. **响应解析** — 将数据源原始响应（字段名如 `f2`）映射为系统标准字段
+3. **数据清洗** — 过滤无效数据、类型转换、格式规范化
+4. **错误处理** — 统一错误码，区分"无数据"和"请求失败"
+
+```typescript
+interface DataAdapter {
+  // 数据类型标识
+  readonly type: DataType;
+
+  // 请求
+  fetch<T>(params: RequestParams): Promise<T>;
+
+  // 响应映射
+  mapResponse(raw: any): SystemStandardData;
+
+  // 是否可用（用于降级判断）
+  isAvailable(): boolean;
+}
+```
+
+### 3.4 降级流程
+
+```
+请求 → DataGateway
+    → 尝试主数据源 Adapter
+        ├─ 成功 → 映射输出 → 返回
+        └─ 失败 → 检查是否有备数据源
+                   ├─ 有 → 切换备数据源 → 重试
+                   │       ├─ 成功 → 映射输出 → 返回
+                   │       └─ 失败 → 抛出异常
+                   └─ 无 → 抛出异常
+```
+
+### 3.5 字段映射示例（实时行情）
+
+| 系统标准字段 | 东财字段 | 新浪字段 | 说明 |
+|------------|---------|---------|------|
+| `price` | `f2` | 最新价 | 当前价格 |
+| `changePct` | `f3` | 涨跌幅 | 涨跌幅(%) |
+| `volume` | `f5` | 成交量 | 成交量(手) |
+| `amount` | `f6` | 成交额 | 成交额(元) |
+| `high` | `f15` | 最高 | 最高价 |
+| `low` | `f16` | 最低 | 最低价 |
+| `open` | `f17` | 今开 | 开盘价 |
+| `prevClose` | `f18` | 昨收 | 昨收价 |
+| `pe` | `f9` | — | 市盈率（仅东财） |
+| `pb` | `f13` | — | 市净率（仅东财） |
+| `marketCap` | `f20` | — | 总市值（仅东财） |
+
+---
+
+## 4. 数据库 Schema 设计
 
 ### 3.1 新增表
 
@@ -202,46 +293,56 @@ model RealtimeData {
 
 ---
 
-## 4. 服务层设计
+## 5. 服务层设计
 
-### 4.1 AkshareService（重构）
+### 5.1 DataGateway（数据源网关）
 
 ```typescript
-// 主要方法
-class AkshareService {
-  // 股票列表
-  fetchStockList(): Promise<StockBasic[]>
+// 数据源网关 — 统一入口，对外屏蔽底层数据源实现
+@Injectable()
+export class DataGateway {
+  // 内部 Adapters（注入）
+  private adapters: Map<DataType, DataAdapter>;
 
-  // 历史行情
-  fetchHistoryData(code, startDate, endDate, adjust): Promise<HistoryItem[]>
+  // 股票列表（统一数据源，无需降级）
+  async getStockList(): Promise<SystemStock[]>
 
-  // 实时行情
-  fetchRealtimeData(codes: string[]): Promise<RealtimeItem[]>
-  fetchBidAsk(code: string): Promise<BidAskItem>
+  // 历史行情（主东财，失败降级腾讯）
+  async getHistory(params: HistoryParams): Promise<SystemHistory[]>
 
-  // 分钟级数据（按需）
-  fetchMinuteData(code, period, date): Promise<MinuteItem[]>
+  // 实时行情（主东财，失败降级新浪）
+  async getRealtime(codes: string[]): Promise<SystemRealtime[]>
 
-  // 板块数据
-  fetchIndustryBoard(): Promise<IndustryBoardItem[]>
-  fetchConceptBoard(symbol): Promise<ConceptBoardItem[]>
+  // 买卖盘口（东财）
+  async getBidAsk(code: string): Promise<SystemBidAsk>
 
-  // 涨停板数据
-  fetchLimitUpPool(date): Promise<LimitUpStockItem[]>
-  fetchLimitUpPrevious(date): Promise<LimitUpStockItem[]>
-  fetchStrongStocks(date): Promise<LimitUpStockItem[]>
-  fetchBrokenStocks(date): Promise<LimitUpStockItem[]>
-  fetchLimitDownPool(date): Promise<LimitUpStockItem[]>
+  // 分钟级数据（主东财，失败降级新浪，按需，不存储）
+  async getMinuteData(params: MinuteParams): Promise<SystemMinute[]>
 
-  // 热搜
-  fetchHotStocks(symbol, date, time): Promise<HotStockItem[]>
+  // 板块数据（同花顺）
+  async getIndustryBoard(): Promise<SystemIndustryBoard[]>
+  async getConceptBoard(symbol: string): Promise<SystemConceptBoard[]>
 
-  // 通用
-  fetchWithRetry<T>(fn, maxRetries): Promise<T | null>
+  // 涨停板数据（东财）
+  async getLimitUpPool(date: string): Promise<SystemLimitUpStock[]>
+  async getStrongStocks(date: string): Promise<SystemLimitUpStock[]>
+  async getBrokenStocks(date: string): Promise<SystemLimitUpStock[]>
+  async getLimitDownPool(date: string): Promise<SystemLimitUpStock[]>
+
+  // 热搜（百度，按需）
+  async getHotStocks(params: HotParams): Promise<SystemHotStock[]>
+
+  // 通用重试机制
+  async fetchWithFallback<T>(
+    primary: () => Promise<T>,
+    fallback: () => Promise<T>,
+    maxRetries?: number,
+  ): Promise<T>
 }
 ```
+```
 
-### 4.2 RealtimePushService（SSE 推送）
+### 5.2 RealtimePushService（SSE 推送）
 
 ```typescript
 // 核心设计：RxJS Subject 管理多订阅者
@@ -268,7 +369,7 @@ export class RealtimePushService {
 }
 ```
 
-### 4.3 MarketService（重构）
+### 5.3 MarketService（重构）
 
 ```typescript
 class MarketService {
@@ -302,9 +403,9 @@ class MarketService {
 
 ---
 
-## 5. 定时任务设计
+## 6. 定时任务设计
 
-### 5.1 任务列表
+### 6.1 任务列表
 
 | 任务 | Cron 表达式 | 说明 |
 |------|-----------|------|
@@ -316,7 +417,7 @@ class MarketService {
 | LimitUpUpdateJob | `*/10 9-15 * * 1-5` | **盘中每10分钟涨停板** |
 | RealtimeCleanupJob | `0 16 * * 1-5` | 盘后清理 Redis 缓存 |
 
-### 5.2 WatchlistRealtimeJob 逻辑
+### 6.2 WatchlistRealtimeJob 逻辑
 
 ```typescript
 @Interval(10000) // 每10秒
@@ -339,7 +440,7 @@ async updateWatchlistRealtime() {
 
 ---
 
-## 6. API 设计
+## 7. API 设计
 
 ### 6.1 REST API
 
@@ -373,7 +474,7 @@ data: {"code":"000001","price":12.3,"changePct":-1.5,...}
 
 ---
 
-## 7. 前端设计
+## 8. 前端设计
 
 ### 7.1 现有页面保留
 
@@ -423,7 +524,7 @@ function useRealtimeSSE(codes: string[]) {
 
 ---
 
-## 8. 任务拆分
+## 9. 任务拆分
 
 | Phase | 任务 | 优先级 | 说明 |
 |-------|------|--------|------|
@@ -439,7 +540,7 @@ function useRealtimeSSE(codes: string[]) {
 
 ---
 
-## 9. 技术选型
+## 10. 技术选型
 
 | 技术 | 用途 | 版本 |
 |------|------|------|
@@ -454,7 +555,7 @@ function useRealtimeSSE(codes: string[]) {
 
 ---
 
-## 10. 数据质量保障
+## 11. 数据质量保障
 
 ### 10.1 校验规则
 
@@ -470,7 +571,7 @@ function useRealtimeSSE(codes: string[]) {
 
 ---
 
-## 11. 待确认事项
+## 12. 待确认事项
 
 1. [ ] 基本面数据（财务指标、PE、PB等）是否需要接入？本次暂不包含
 2. [ ] 分钟级历史数据保留多久？本次不存储，按需查询
