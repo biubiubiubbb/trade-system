@@ -1,12 +1,12 @@
 import { Module } from '@nestjs/common';
 import { MarketController } from './market.controller';
 import { MarketService } from './market.service';
-import { RealtimePushService } from './realtime-push.service';
-import { DataGateway } from '../../services/data-gateway/data-gateway.service';
+import { ServicesModule } from '../../services/services.module';
 
 @Module({
+  imports: [ServicesModule],
   controllers: [MarketController],
-  providers: [MarketService, RealtimePushService, DataGateway],
+  providers: [MarketService],
   exports: [MarketService],
 })
 export class MarketModule {}

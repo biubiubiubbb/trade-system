@@ -3,7 +3,7 @@ import { MarketService } from './market.service';
 import { PrismaService } from '../../database/prisma.service';
 import { RedisService } from '../../services/redis.service';
 import { DataGateway } from '../../services/data-gateway/data-gateway.service';
-import { RealtimePushService } from './realtime-push.service';
+import { RealtimePushService } from '../../services/realtime-push.service';
 
 describe('MarketService', () => {
   let service: MarketService;

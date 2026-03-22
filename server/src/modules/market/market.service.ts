@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
 import { RedisService } from '../../services/redis.service';
 import { DataGateway } from '../../services/data-gateway/data-gateway.service';
-import { RealtimePushService } from './realtime-push.service';
+import { RealtimePushService } from '../../services/realtime-push.service';
 import { StockListQueryDto } from './dto/stock.dto';
 import { HistoryQueryDto } from './dto/history-query.dto';
 import { SectorQueryDto } from './dto/sector.dto';
@@ -175,6 +175,51 @@ export class MarketService {
     return this.dataGateway.getHotStocks({
       symbol: symbol as any || 'A股',
     });
+  }
+
+  // === 概念板块指数历史 ===
+  async getConceptBoardIndex(name: string, startDate?: string, endDate?: string) {
+    const today = new Date();
+    const start = startDate || new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0].replace(/-/g, '');
+    const end = endDate || today.toISOString().split('T')[0].replace(/-/g, '');
+    return this.dataGateway.getConceptBoardIndex({ name, startDate: start, endDate: end });
+  }
+
+  // === 概念板块详情 ===
+  async getConceptBoardInfo(name: string) {
+    return this.dataGateway.getConceptBoardInfo(name);
+  }
+
+  // === 行业板块指数历史 ===
+  async getIndustryBoardIndex(name: string, startDate?: string, endDate?: string) {
+    const today = new Date();
+    const start = startDate || new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0].replace(/-/g, '');
+    const end = endDate || today.toISOString().split('T')[0].replace(/-/g, '');
+    return this.dataGateway.getIndustryBoardIndex({ name, startDate: start, endDate: end });
+  }
+
+  // === 昨日涨停股池 ===
+  async getPreviousLimitUp(date?: string) {
+    const d = date || new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().split('T')[0].replace(/-/g, '');
+    return this.dataGateway.getPreviousLimitUpPool(d);
+  }
+
+  // === 次新股池 ===
+  async getSubNewStocks(date?: string) {
+    const d = date || new Date().toISOString().split('T')[0].replace(/-/g, '');
+    return this.dataGateway.getSubNewPool(d);
+  }
+
+  // === 炸板股池 ===
+  async getBrokenLimitUp(date?: string) {
+    const d = date || new Date().toISOString().split('T')[0].replace(/-/g, '');
+    return this.dataGateway.getBrokenLimitUpPool(d);
+  }
+
+  // === 跌停股池 ===
+  async getLimitDown(date?: string) {
+    const d = date || new Date().toISOString().split('T')[0].replace(/-/g, '');
+    return this.dataGateway.getLimitDownPoolEm(d);
   }
 
   // === 辅助方法 ===

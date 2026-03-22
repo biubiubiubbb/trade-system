@@ -13,6 +13,7 @@ interface BoardItemProps {
   price?: number;
   continueBoard?: number;
   brokenCount?: number;
+  industry?: string;
   onClick?: () => void;
 }
 
@@ -27,6 +28,7 @@ export function BoardItem({
   price,
   continueBoard,
   brokenCount,
+  industry,
   onClick,
 }: BoardItemProps) {
   const { theme } = useTheme();
@@ -75,29 +77,55 @@ export function BoardItem({
             </div>
           </div>
         ) : (
-          <div className="flex justify-between items-center">
-            <div>
-              <div className="font-medium text-sm text-gray-100">{name}</div>
-              <div className="text-xs text-gray-400 mt-0.5">
-                {code}
+          <div className="flex justify-between items-start">
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2">
+                <span className="font-medium text-sm text-gray-100 truncate">{name}</span>
+              </div>
+              <div className="flex items-center gap-2 mt-1">
+                <span className="font-mono text-xs text-gray-400">{code}</span>
+                {industry && (
+                  <span
+                    className="text-xs px-1.5 py-0.5 rounded"
+                    style={{
+                      backgroundColor: 'rgba(59, 130, 246, 0.15)',
+                      color: '#60A5FA',
+                      fontFamily: 'var(--font-mono)',
+                      fontSize: 10,
+                    }}
+                  >
+                    {industry}
+                  </span>
+                )}
                 {continueBoard !== undefined && continueBoard > 0 && (
-                  <span className="ml-2 px-1.5 py-0.5 bg-yellow-500/20 text-yellow-400 rounded text-xs">
+                  <span className="px-1.5 py-0.5 bg-yellow-500/20 text-yellow-400 rounded text-xs">
                     {continueBoard}连板
                   </span>
                 )}
                 {brokenCount !== undefined && brokenCount > 0 && (
-                  <span className="ml-1 px-1.5 py-0.5 bg-orange-500/20 text-orange-400 rounded text-xs">
+                  <span className="px-1.5 py-0.5 bg-orange-500/20 text-orange-400 rounded text-xs">
                     {brokenCount}次炸板
                   </span>
                 )}
               </div>
             </div>
-            <div className="text-right">
-              <div className={`text-xl font-bold ${isUp ? 'text-red-400' : 'text-green-400'}`}>
-                {changePct !== undefined ? `${isUp ? '+' : ''}${changePct.toFixed(2)}%` : '--'}
-              </div>
-              <div className="text-xs text-gray-400">
-                ¥{price?.toFixed(2)}
+            <div className="text-right ml-3">
+              <span
+                className="font-mono text-lg font-bold"
+                style={{ color: isUp ? '#EF4444' : '#10B981' }}
+              >
+                {price?.toFixed(2) || '--'}
+              </span>
+              <div className="flex items-center justify-end gap-1 mt-1">
+                <span
+                  className="font-mono text-xs font-medium px-1.5 py-0.5 rounded"
+                  style={{
+                    backgroundColor: isUp ? 'rgba(239, 68, 68, 0.12)' : 'rgba(16, 185, 129, 0.12)',
+                    color: isUp ? '#EF4444' : '#10B981',
+                  }}
+                >
+                  {changePct !== undefined ? `${isUp ? '+' : ''}${changePct.toFixed(2)}%` : '--'}
+                </span>
               </div>
             </div>
           </div>
@@ -146,24 +174,50 @@ export function BoardItem({
             </div>
           </div>
         ) : (
-          <div className="flex justify-between items-center">
-            <div>
-              <div className="font-heading text-sm text-gray-800">{name}</div>
-              <div className="font-mono text-xs text-gray-600 mt-0.5">
-                {code}
+          <div className="flex justify-between items-start">
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2">
+                <span className="font-heading text-sm text-gray-800 truncate">{name}</span>
+              </div>
+              <div className="flex items-center gap-2 mt-1">
+                <span className="font-mono text-xs text-gray-600">{code}</span>
+                {industry && (
+                  <span
+                    className="text-xs px-1.5 py-0.5 rounded"
+                    style={{
+                      backgroundColor: 'rgba(59, 130, 246, 0.15)',
+                      color: 'var(--color-primary)',
+                      fontFamily: 'var(--font-mono)',
+                      fontSize: 9,
+                    }}
+                  >
+                    {industry}
+                  </span>
+                )}
                 {continueBoard !== undefined && continueBoard > 0 && (
-                  <span className="ml-1 bg-yellow-300 text-gray-800 px-1 text-xs">
+                  <span className="bg-yellow-300 text-gray-800 px-1 text-xs">
                     ×{continueBoard}
                   </span>
                 )}
               </div>
             </div>
-            <div className="text-right">
-              <div className={`font-mono text-lg font-bold ${isUp ? 'text-red-500' : 'text-green-500'}`}>
-                {changePct !== undefined ? `${isUp ? '+' : ''}${changePct.toFixed(1)}%` : '--'}
-              </div>
-              <div className="font-mono text-xs text-gray-600">
-                ¥{price?.toFixed(2)}
+            <div className="text-right ml-3">
+              <span
+                className="font-mono text-lg font-bold"
+                style={{ color: isUp ? 'var(--color-up)' : 'var(--color-down)' }}
+              >
+                ¥{price?.toFixed(2) || '--'}
+              </span>
+              <div className="flex items-center justify-end gap-1 mt-1">
+                <span
+                  className="font-mono text-xs font-medium px-1.5 py-0.5 rounded"
+                  style={{
+                    backgroundColor: isUp ? 'rgba(239, 68, 68, 0.15)' : 'rgba(16, 185, 129, 0.15)',
+                    color: isUp ? 'var(--color-up)' : 'var(--color-down)',
+                  }}
+                >
+                  {changePct !== undefined ? `${isUp ? '+' : ''}${changePct.toFixed(1)}%` : '--'}
+                </span>
               </div>
             </div>
           </div>
@@ -192,18 +246,46 @@ export function BoardItem({
           </div>
         </div>
       ) : (
-        <div className="flex justify-between items-center">
-          <div>
-            <div className="font-medium text-sm text-black">{name}</div>
-            <div className="text-xs text-gray-400 mt-0.5">
-              {code}
+        <div className="flex justify-between items-start">
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2">
+              <span className="font-medium text-sm text-black truncate">{name}</span>
+            </div>
+            <div className="flex items-center gap-2 mt-1">
+              <span className="font-mono text-xs text-gray-400">{code}</span>
+              {industry && (
+                <span
+                  className="text-xs px-1.5 py-0.5 rounded"
+                  style={{
+                    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                    color: 'var(--color-primary)',
+                    fontFamily: 'var(--font-mono)',
+                    fontSize: 10,
+                  }}
+                >
+                  {industry}
+                </span>
+              )}
               {continueBoard !== undefined && continueBoard > 0 && (
-                <span className="ml-1">{continueBoard}连板</span>
+                <span className="text-xs text-gray-400">{continueBoard}连板</span>
               )}
             </div>
           </div>
-          <div className={`text-lg font-light ${isUp ? 'text-black' : 'text-gray-400'}`}>
-            {changePct !== undefined ? `${isUp ? '+' : ''}${changePct.toFixed(2)}%` : '--'}
+          <div className="text-right ml-3">
+            <span className={`font-mono text-lg font-medium ${isUp ? 'text-black' : 'text-gray-400'}`}>
+              {price?.toFixed(2) || '--'}
+            </span>
+            <div className="flex items-center justify-end gap-1 mt-1">
+              <span
+                className="font-mono text-xs font-medium px-1.5 py-0.5 rounded"
+                style={{
+                  backgroundColor: isUp ? 'rgba(239, 68, 68, 0.1)' : 'rgba(16, 185, 129, 0.1)',
+                  color: isUp ? 'var(--color-up)' : 'var(--color-down)',
+                }}
+              >
+                {changePct !== undefined ? `${isUp ? '+' : ''}${changePct.toFixed(2)}%` : '--'}
+              </span>
+            </div>
           </div>
         </div>
       )}

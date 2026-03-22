@@ -11,7 +11,6 @@ import { SectorList } from '../components/market/SectorList';
 import { LimitUpList } from '../components/market/LimitUpList';
 import { BoardHistoryModal } from '../components/market/BoardHistoryModal';
 import * as Tabs from '@radix-ui/react-tabs';
-import * as Select from '@radix-ui/react-select';
 
 interface Stock {
   code: string;
@@ -246,7 +245,7 @@ export function Market() {
           </Tabs.List>
 
           {/* Market Tab Content */}
-          <Tabs.Content value="market" className="flex-1 overflow-y-auto">
+          <Tabs.Content value="market" className="flex-1 min-h-0 overflow-y-auto">
             {stocks.map((stock) => {
               const realtime = realtimeMap.get(stock.code) || stock.realtime;
               return (
@@ -264,7 +263,7 @@ export function Market() {
           </Tabs.Content>
 
           {/* Sector Tab Content */}
-          <Tabs.Content value="sector" className="flex-1 flex flex-col overflow-hidden">
+          <Tabs.Content value="sector" className="flex-1 min-h-0 flex flex-col overflow-hidden">
             {/* 行业/概念切换 */}
             <div className="flex shrink-0" style={{ borderBottom: '1px solid var(--color-border)' }}>
               <button
@@ -293,52 +292,27 @@ export function Market() {
 
           {/* LimitUp Tab Content */}
           <Tabs.Content value="limitup" className="flex-1 flex flex-col overflow-hidden">
-            {/* 股池类型选择 */}
-            <div className="p-2 shrink-0" style={{ borderBottom: '1px solid var(--color-border)' }}>
-              <Select.Root
-                value={limitUpType}
-                onValueChange={(v) => setLimitUpType(v as any)}
-              >
-                <Select.Trigger
-                  className="w-full px-3 py-2 text-xs rounded flex items-center justify-between"
+            {/* 股池类型选择 - 标签切换 */}
+            <div className="flex shrink-0" style={{ borderBottom: '1px solid var(--color-border)' }}>
+              {(['up', 'previous', 'subnew', 'broken', 'down'] as const).map((t) => (
+                <button
+                  key={t}
+                  className="flex-1 py-2 text-xs transition-colors relative"
                   style={{
-                    backgroundColor: 'var(--color-surface)',
-                    border: isCartoon ? '2px solid var(--color-border)' : '1px solid var(--color-border)',
-                    color: 'var(--color-text)',
+                    color: limitUpType === t ? 'var(--color-primary)' : 'var(--color-text-secondary)',
+                    backgroundColor: limitUpType === t ? 'rgba(59, 130, 246, 0.1)' : 'transparent',
                   }}
+                  onClick={() => setLimitUpType(t)}
                 >
-                  <Select.Value />
-                  <Select.Icon>
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                    </svg>
-                  </Select.Icon>
-                </Select.Trigger>
-                <Select.Portal>
-                  <Select.Content
-                    className="overflow-hidden rounded shadow-lg"
-                    style={{
-                      backgroundColor: 'var(--color-surface)',
-                      border: '1px solid var(--color-border)',
-                    }}
-                  >
-                    <Select.Viewport className="p-1">
-                      {(['up', 'previous', 'subnew', 'broken', 'down'] as const).map((t) => (
-                        <Select.Item
-                          key={t}
-                          value={t}
-                          className="px-3 py-2 text-xs cursor-pointer rounded outline-none transition-colors"
-                          style={{ color: 'var(--color-text)' }}
-                          onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'var(--color-primary)')}
-                          onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
-                        >
-                          <Select.ItemText>{limitUpTypeLabels[t]}</Select.ItemText>
-                        </Select.Item>
-                      ))}
-                    </Select.Viewport>
-                  </Select.Content>
-                </Select.Portal>
-              </Select.Root>
+                  {limitUpTypeLabels[t]}
+                  {limitUpType === t && (
+                    <div
+                      className="absolute bottom-0 left-0 right-0 h-0.5"
+                      style={{ backgroundColor: 'var(--color-primary)' }}
+                    />
+                  )}
+                </button>
+              ))}
             </div>
             {/* 涨停板列表 */}
             <div className="flex-1 overflow-hidden">

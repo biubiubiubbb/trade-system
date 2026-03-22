@@ -108,4 +108,61 @@ export class MarketController {
     const data = await this.marketService.getHotStocks(symbol || 'A股', '', '今日');
     return { code: 0, message: 'success', data };
   }
+
+  @Get('concept/:name/history')
+  @ApiOperation({ summary: '获取概念板块指数历史' })
+  async getConceptBoardIndex(
+    @Param('name') name: string,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+  ) {
+    const data = await this.marketService.getConceptBoardIndex(name, startDate, endDate);
+    return { code: 0, message: 'success', data };
+  }
+
+  @Get('concept/:name/info')
+  @ApiOperation({ summary: '获取概念板块详情' })
+  async getConceptBoardInfo(@Param('name') name: string) {
+    const data = await this.marketService.getConceptBoardInfo(name);
+    return { code: 0, message: 'success', data };
+  }
+
+  @Get('industry/:name/history')
+  @ApiOperation({ summary: '获取行业板块指数历史' })
+  async getIndustryBoardIndex(
+    @Param('name') name: string,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+  ) {
+    const data = await this.marketService.getIndustryBoardIndex(name, startDate, endDate);
+    return { code: 0, message: 'success', data };
+  }
+
+  @Get('zt/previous')
+  @ApiOperation({ summary: '获取昨日涨停股池' })
+  async getPreviousLimitUp(@Query('date') date?: string) {
+    const data = await this.marketService.getPreviousLimitUp(date);
+    return { code: 0, message: 'success', data };
+  }
+
+  @Get('zt/subnew')
+  @ApiOperation({ summary: '获取次新股池' })
+  async getSubNewStocks(@Query('date') date?: string) {
+    const data = await this.marketService.getSubNewStocks(date);
+    return { code: 0, message: 'success', data };
+  }
+
+  @Get('zt/broken')
+  @ApiOperation({ summary: '获取炸板股池' })
+  async getBrokenLimitUp(@Query('date') date?: string) {
+    const data = await this.marketService.getBrokenLimitUp(date);
+    return { code: 0, message: 'success', data };
+  }
+
+  @Get('zt/down')
+  @ApiOperation({ summary: '获取跌停股池' })
+  async getLimitDown(@Query('date') date?: string) {
+    const data = await this.marketService.getLimitDown(date);
+    return { code: 0, message: 'success', data };
+  }
 }

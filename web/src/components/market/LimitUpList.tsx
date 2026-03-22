@@ -133,6 +133,7 @@ export function LimitUpList({ type, onStockClick }: LimitUpListProps) {
             price={stock.price}
             continueBoard={stock.continueBoard}
             brokenCount={stock.brokenCount}
+            industry={stock.industry}
             onClick={() => onStockClick?.(stock.code)}
           />
         ))}

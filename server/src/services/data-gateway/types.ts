@@ -128,3 +128,138 @@ export interface MinuteParams {
 export interface HotParams {
   symbol: string; // 默认 'A股'
 }
+
+// === 新增接口类型 ===
+
+// 概念板块指数历史
+export interface SystemConceptBoardIndex {
+  date: Date;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  volume: number;
+  amount: number;
+}
+
+// 概念板块详情
+export interface SystemConceptBoardInfo {
+  open?: number;
+  prevClose?: number;
+  low?: number;
+  high?: number;
+  volume?: number; // 万手
+  changePct?: string; // 涨幅%
+  changeRank?: string; // 涨幅排名
+  riseFallCount?: string; // 涨跌家数
+  netInflow?: number; // 资金净流入(亿)
+  amount?: number; // 成交额(亿)
+}
+
+// 行业板块指数历史
+export interface SystemIndustryBoardIndex {
+  date: Date;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  volume: number;
+  amount: number;
+}
+
+// 昨日涨停股池
+export interface SystemPreviousLimitUp {
+  code: string;
+  name: string;
+  changePct: number;
+  price: number;
+  limitUpPrice: number;
+  amount: number;
+  floatMarketCap: number;
+  totalMarketCap: number;
+  turnoverRate: number;
+  speed: number;
+  amplitude: number;
+  lastSealTime: string;
+  lastBoardCount: number;
+  sealStat: string;
+  industry: string;
+}
+
+// 次新股池
+export interface SystemSubNewStock {
+  code: string;
+  name: string;
+  changePct: number;
+  price: number;
+  limitUpPrice: number;
+  amount: number;
+  floatMarketCap: number;
+  totalMarketCap: number;
+  turnoverRate: number;
+  openBoardDays: number;
+  openBoardDate: string;
+  listDate: string;
+  isNewHigh: boolean;
+  sealStat: string;
+  industry: string;
+}
+
+// 炸板股池
+export interface SystemBrokenLimitUp {
+  code: string;
+  name: string;
+  changePct: number;
+  price: number;
+  limitUpPrice: number;
+  amount: number;
+  floatMarketCap: number;
+  totalMarketCap: number;
+  turnoverRate: number;
+  speed: number;
+  firstSealTime: string;
+  brokenCount: number;
+  sealStat: number;
+  amplitude: number;
+  industry: string;
+}
+
+// 跌停股池
+export interface SystemLimitDownStock {
+  code: string;
+  name: string;
+  changePct: number;
+  price: number;
+  amount: number;
+  floatMarketCap: number;
+  totalMarketCap: number;
+  turnoverRate: number;
+  pe?: number;
+  volumeRatio?: number;
+  bid1?: number;
+  ask1?: number;
+  amplitude: number;
+  industry: string;
+}
+
+// 超跌股池
+export interface SystemBrokenStocks {
+  code: string;
+  name: string;
+  changePct: number;
+  price: number;
+  amount: number;
+  floatMarketCap: number;
+  totalMarketCap: number;
+  turnoverRate: number;
+  pe: number;
+  pb: number;
+  industry: string;
+}
+
+// 板块历史参数
+export interface BoardIndexParams {
+  name: string; // 板块名称
+  startDate: string;
+  endDate: string;
+}

@@ -3,7 +3,7 @@ import { Interval } from '@nestjs/schedule';
 import { DataGateway } from '../services/data-gateway/data-gateway.service';
 import { PrismaService } from '../database/prisma.service';
 import { RedisService } from '../services/redis.service';
-import { RealtimePushService } from '../modules/market/realtime-push.service';
+import { RealtimePushService } from '../services/realtime-push.service';
 
 @Injectable()
 export class WatchlistRealtimeJob {

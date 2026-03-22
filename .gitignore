@@ -1,12 +1,9 @@
 # Dependencies
 node_modules/
 
-# Build
+# Build outputs
 dist/
-
-# IDE
-.idea/
-.vscode/
+*.tsbuildinfo
 
 # Environment
 .env
@@ -20,13 +17,20 @@ npm-debug.log*
 
 # OS
 .DS_Store
+Thumbs.db
 
-# Prisma
-prisma/*.db
-prisma/*.db-journal
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
 
 # Coverage
 coverage/
+
+# Prisma
+server/prisma/*.db
+server/prisma/*.db-journal
 
 # Temporary
 tmp/

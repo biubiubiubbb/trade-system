@@ -105,6 +105,117 @@ export interface LimitUpStock {
   brokenCount?: number;
 }
 
+// 概念板块指数历史
+export interface ConceptBoardIndex {
+  date: string;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  volume: number;
+  amount: number;
+}
+
+// 概念板块详情
+export interface ConceptBoardInfo {
+  open?: number;
+  prevClose?: number;
+  low?: number;
+  high?: number;
+  volume?: number;
+  changePct?: string;
+  changeRank?: string;
+  riseFallCount?: string;
+  netInflow?: number;
+  amount?: number;
+}
+
+// 行业板块指数历史
+export interface IndustryBoardIndex {
+  date: string;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  volume: number;
+  amount: number;
+}
+
+// 昨日涨停
+export interface PreviousLimitUp {
+  code: string;
+  name: string;
+  changePct: number;
+  price: number;
+  limitUpPrice: number;
+  amount: number;
+  floatMarketCap: number;
+  totalMarketCap: number;
+  turnoverRate: number;
+  speed: number;
+  amplitude: number;
+  lastSealTime: string;
+  lastBoardCount: number;
+  sealStat: string;
+  industry: string;
+}
+
+// 次新股
+export interface SubNewStock {
+  code: string;
+  name: string;
+  changePct: number;
+  price: number;
+  limitUpPrice: number;
+  amount: number;
+  floatMarketCap: number;
+  totalMarketCap: number;
+  turnoverRate: number;
+  openBoardDays: number;
+  openBoardDate: string;
+  listDate: string;
+  isNewHigh: boolean;
+  sealStat: string;
+  industry: string;
+}
+
+// 炸板股
+export interface BrokenLimitUp {
+  code: string;
+  name: string;
+  changePct: number;
+  price: number;
+  limitUpPrice: number;
+  amount: number;
+  floatMarketCap: number;
+  totalMarketCap: number;
+  turnoverRate: number;
+  speed: number;
+  firstSealTime: string;
+  brokenCount: number;
+  sealStat: number;
+  amplitude: number;
+  industry: string;
+}
+
+// 跌停股
+export interface LimitDownStock {
+  code: string;
+  name: string;
+  changePct: number;
+  price: number;
+  amount: number;
+  floatMarketCap: number;
+  totalMarketCap: number;
+  turnoverRate: number;
+  pe?: number;
+  volumeRatio?: number;
+  bid1?: number;
+  ask1?: number;
+  amplitude: number;
+  industry: string;
+}
+
 function api<T>(path: string): Promise<T> {
   return fetch(`${BASE_URL}${path}`).then((res) => {
     if (!res.ok) throw new Error(`API ${res.status}: ${path}`);
@@ -163,4 +274,36 @@ export const marketApi = {
     api<{ data: { name: string; code: string; changePct: string; heat: number }[] }>(
       `/hot?${new URLSearchParams(params as any)}`
     ).then((r) => r.data),
+
+  // 概念板块指数历史
+  getConceptBoardIndex: (name: string, startDate?: string, endDate?: string) =>
+    api<{ data: ConceptBoardIndex[] }>(
+      `/concept/${encodeURIComponent(name)}/history?${new URLSearchParams({ startDate: startDate || '', endDate: endDate || '' } as any)}`
+    ).then((r) => r.data),
+
+  // 概念板块详情
+  getConceptBoardInfo: (name: string) =>
+    api<{ data: ConceptBoardInfo }>(`/concept/${encodeURIComponent(name)}/info`).then((r) => r.data),
+
+  // 行业板块指数历史
+  getIndustryBoardIndex: (name: string, startDate?: string, endDate?: string) =>
+    api<{ data: IndustryBoardIndex[] }>(
+      `/industry/${encodeURIComponent(name)}/history?${new URLSearchParams({ startDate: startDate || '', endDate: endDate || '' } as any)}`
+    ).then((r) => r.data),
+
+  // 昨日涨停股池
+  getPreviousLimitUp: (date?: string) =>
+    api<{ data: PreviousLimitUp[] }>(`/zt/previous${date ? `?date=${date}` : ''}`).then((r) => r.data),
+
+  // 次新股池
+  getSubNewStocks: (date?: string) =>
+    api<{ data: SubNewStock[] }>(`/zt/subnew${date ? `?date=${date}` : ''}`).then((r) => r.data),
+
+  // 炸板股池
+  getBrokenLimitUp: (date?: string) =>
+    api<{ data: BrokenLimitUp[] }>(`/zt/broken${date ? `?date=${date}` : ''}`).then((r) => r.data),
+
+  // 跌停股池
+  getLimitDown: (date?: string) =>
+    api<{ data: LimitDownStock[] }>(`/zt/down${date ? `?date=${date}` : ''}`).then((r) => r.data),
 };

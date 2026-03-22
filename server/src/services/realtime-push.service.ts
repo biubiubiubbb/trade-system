@@ -1,8 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Observable, Subject } from 'rxjs';
-import { map, flatMap } from 'rxjs/operators';
-import { RedisService } from '../../services/redis.service';
-import { SystemRealtime } from '../../services/data-gateway/types';
+import { flatMap } from 'rxjs/operators';
+import { RedisService } from './redis.service';
+import { SystemRealtime } from './data-gateway/types';
 
 interface RealtimeEvent {
   codes: string[];
