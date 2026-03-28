@@ -13,7 +13,6 @@ const navItems = [
 export function Layout() {
   const location = useLocation();
   const { theme } = useTheme();
-
   const isMinimal = theme === 'minimal';
 
   return (
