@@ -263,7 +263,7 @@ export function Market() {
           </Tabs.Content>
 
           {/* Sector Tab Content */}
-          <Tabs.Content value="sector" className="flex-1 min-h-0 flex flex-col overflow-hidden">
+          <Tabs.Content value="sector" className="flex-1 min-h-0 overflow-y-auto">
             {/* 行业/概念切换 */}
             <div className="flex shrink-0" style={{ borderBottom: '1px solid var(--color-border)' }}>
               <button
@@ -291,7 +291,7 @@ export function Market() {
           </Tabs.Content>
 
           {/* LimitUp Tab Content */}
-          <Tabs.Content value="limitup" className="flex-1 flex flex-col overflow-hidden">
+          <Tabs.Content value="limitup" className="flex-1 min-h-0 overflow-y-auto">
             {/* 股池类型选择 - 标签切换 */}
             <div className="flex shrink-0" style={{ borderBottom: '1px solid var(--color-border)' }}>
               {(['up', 'previous', 'subnew', 'broken', 'down'] as const).map((t) => (

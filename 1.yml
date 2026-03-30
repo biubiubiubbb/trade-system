@@ -1,0 +1,56 @@
+otcs:
+  data-clearing:
+    sales-jdbc: # 销售端租户数据库
+      AUL711HK:
+        url-pattern: jdbc:mysql://mysql-hk-platbss-uat.hszq8.com:3306/otcs_note_sales_vil_aul711hk?useUnicode=true&characterEncoding=utf-8&zeroDateTimeBehavior=convertToNull&rewriteBatchedStatements=true
+        username: otcs_note_sales_vil_aul711hk
+        password: tsWowHd/h2+TFG9x2beC93mWKwEWPFwWBMgKJg==
+      CMS101293:
+        url: jdbc:mysql://mysql-hk-global-feature.hszq8.com:3306/otcs_note_sales_vil_cms101293?useUnicode=true&characterEncoding=utf-8&zeroDateTimeBehavior=convertToNull&rewriteBatchedStatements=true
+        username: otcs_note_sales_vil_cms101293
+        password: tsWowHd/h2+TFG9x2beC93mWKwEUZHfergKszow=
+    issuance-jdbc: # 发行端数据库
+        url: jdbc:mysql://mysql-hk-global-feature.hszq8.com:3306/otcs_note_issuance?useUnicode=true&characterEncoding=utf-8&zeroDateTimeBehavior=convertToNull&rewriteBatchedStatements=true
+        username: otcs_note_issuance
+        password: tsWowHd/h2+TFHV2+H6fPffR
+      
+    order-hedge-account: # 交易对冲账户
+      CNY:
+        account: 383
+        capital-account: 100383
+      HKD:
+        account: 260
+        capital-account: 100260
+    reconciliation-hedge-account:  # 对账对账户
+      clearlove7:
+        name: 诺言
+        account: 259
+        capital-account: 100259
+      clearlove11:
+        name: 厂长
+        account: 260
+        capital-account: 100260
+      VIL20221222:
+        name: 华盛-郑贵波
+        account: 315
+        capital-account: 100315
+      CNY-test1:
+        name: 深圳-测试1
+        account: 383
+        capital-account: 100313
+      jacky001:
+        name: jacky001
+        account: 403
+        capital-account: 100403
+      jikun.liao:
+        name: 廖吉坤
+        account: 409
+        capital-account: 100409
+      Aa12345:
+        name: 我的测试账号
+        account: 414
+        capital-account: 100414
+      Aa123456:
+        name: 我的测试账号2
+        account: 416
+        capital-account: 100416
